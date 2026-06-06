@@ -135,7 +135,7 @@
                         </a>
 
                     </li>
-
+<!-- 
                     <?php if(Route::has('register')): ?>
 
                         <li class="nav-item">
@@ -143,7 +143,7 @@
                             <a href="<?php echo e(route('register')); ?>"
                                class="btn btn-dark px-4">
 
-                                Register
+                                Register -->
 
                             </a>
 

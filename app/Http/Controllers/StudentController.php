@@ -6,6 +6,8 @@ use App\Models\Student;
 use App\Models\SchoolClass;
 use App\Models\Section;
 use App\Models\AcademicYear;
+use App\Models\Payment;
+use App\Models\Invoice;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
@@ -17,16 +19,33 @@ class StudentController extends Controller
     | INDEX
     |--------------------------------------------------------------------------
     */
-    public function index()
+    public function index(Request $request)
     {
-        $yearId = session('academic_year_id');
+        $query = Student::query()->with([
+            'schoolClass',
+            'section',
+            'academicYear'
+        ]);
 
-        $students = Student::with(['schoolClass', 'section', 'academicYear'])
-            ->when($yearId, function ($query) use ($yearId) {
-                $query->where('academic_year_id', $yearId);
-            })
-            ->latest()
-            ->paginate(10);
+        // FILTER BY CLASS
+        if ($request->filled('class_id')) {
+            $query->where('class_id', $request->class_id);
+        }
+
+        // SEARCH
+        if ($request->filled('search')) {
+            $search = $request->search;
+
+            $query->where(function ($q) use ($search) {
+                $q->where('student_id', 'like', "%{$search}%")
+                  ->orWhere('first_name', 'like', "%{$search}%")
+                  ->orWhere('last_name', 'like', "%{$search}%");
+            });
+        }
+
+        $students = $query->latest()
+            ->paginate(10)
+            ->withQueryString();
 
         return view('students.index', [
             'students' => $students,
@@ -78,17 +97,13 @@ class StudentController extends Controller
             'photo' => 'nullable|image|mimes:jpg,jpeg,png|max:2048',
         ]);
 
-        /*
-        |-----------------------------------------
-        | AUTO STUDENT ID GENERATION
-        |-----------------------------------------
-        */
+        // AUTO STUDENT ID
         if (empty($data['student_id'])) {
-
             $class = SchoolClass::findOrFail($data['class_id']);
             $count = Student::where('class_id', $data['class_id'])->count() + 1;
 
             $prefix = strtoupper(substr($class->name, 0, 3));
+
             $studentId = $prefix . '-' . str_pad($count, 4, '0', STR_PAD_LEFT);
 
             while (Student::where('student_id', $studentId)->exists()) {
@@ -99,11 +114,7 @@ class StudentController extends Controller
             $data['student_id'] = $studentId;
         }
 
-        /*
-        |-----------------------------------------
-        | PHOTO UPLOAD
-        |-----------------------------------------
-        */
+        // PHOTO
         if ($request->hasFile('photo')) {
             $data['photo'] = $request->file('photo')->store('students', 'public');
         }
@@ -126,10 +137,24 @@ class StudentController extends Controller
             'section',
             'academicYear',
             'invoices',
-            'payments' // 🔥 IMPORTANT FOR FINANCE
+            'payments'
         ]);
 
         return view('students.show', compact('student'));
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | PAYMENTS (FIX FOR YOUR ERROR)
+    |--------------------------------------------------------------------------
+    */
+    public function payments(Student $student)
+    {
+        $payments = Payment::where('student_id', $student->id)
+            ->latest()
+            ->get();
+
+        return view('students.payments', compact('student', 'payments'));
     }
 
     /*
@@ -180,11 +205,6 @@ class StudentController extends Controller
             'photo' => 'nullable|image|mimes:jpg,jpeg,png|max:2048',
         ]);
 
-        /*
-        |-----------------------------------------
-        | PHOTO REPLACE
-        |-----------------------------------------
-        */
         if ($request->hasFile('photo')) {
 
             if ($student->photo && Storage::disk('public')->exists($student->photo)) {

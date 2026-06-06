@@ -11,14 +11,14 @@ class Invoice extends Model
 
     protected $fillable = [
         'invoice_no',
-        'student_id',        // ✅ ADDED (nullable for class-based invoices)
+        'student_id',
         'class_id',
         'section_id',
         'academic_year_id',
-        'student_type',      // ✅ ADDED (Old or New)
+        'student_type',
         'total_amount',
-        'paid_amount',       // ✅ ADDED
-        'balance',           // ✅ ADDED
+        'paid_amount',
+        'balance',
         'status',
         'created_by',
         'due_date',
@@ -26,7 +26,40 @@ class Invoice extends Model
 
     /*
     |--------------------------------------------------------------------------
-    | STUDENT (nullable - for individual student invoices)
+    | BOOT - Auto-sync database columns with actual payments
+    |--------------------------------------------------------------------------
+    */
+    protected static function boot()
+    {
+        parent::boot();
+
+        // When retrieving an invoice, auto-sync paid_amount, balance, status from actual payments
+        static::retrieved(function ($invoice) {
+            $actualPaid = $invoice->payments()->sum('amount_paid');
+            $actualBalance = max(0, $invoice->total_amount - $actualPaid);
+            
+            $actualStatus = match (true) {
+                $actualPaid <= 0 => 'Unpaid',
+                $actualPaid < $invoice->total_amount => 'Partial',
+                default => 'Paid',
+            };
+
+            // Only update if different (to avoid unnecessary DB writes)
+            if ($invoice->paid_amount != $actualPaid || 
+                $invoice->balance != $actualBalance || 
+                $invoice->status !== $actualStatus) {
+                
+                $invoice->paid_amount = $actualPaid;
+                $invoice->balance = $actualBalance;
+                $invoice->status = $actualStatus;
+                $invoice->saveQuietly(); // Save without triggering events
+            }
+        });
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | STUDENT
     |--------------------------------------------------------------------------
     */
     public function student()

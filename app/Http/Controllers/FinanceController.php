@@ -7,38 +7,54 @@ use App\Models\Invoice;
 use App\Models\Payment;
 use App\Models\SchoolClass;
 use App\Models\Student;
+use App\Models\Section; // Ensure this matches your actual Section model name if it exists
 use Illuminate\Http\Request;
 
 class FinanceController extends Controller
 {
     /*
     |--------------------------------------------------------------------------
-    | SUMMARY
+    | SUMMARY (DASHBOARD)
     |--------------------------------------------------------------------------
+    |
     */
     public function summary(Request $request)
     {
         $studentType = $request->student_type;
 
+        // Total Income - payments received
         $totalIncome = Payment::when($studentType, function ($q) use ($studentType) {
             $q->whereHas('student', fn($q2) =>
                 $q2->where('student_type', $studentType)
             );
         })->sum('amount_paid');
 
+        // Total Expenses
         $totalExpenses = Expense::sum('amount');
+
+        // Total Expected (all invoices total amount)
         $totalExpected = Invoice::sum('total_amount');
+
+        // ✅ FIXED: Outstanding Fees = sum of balance column (NOT expected - income)
+        // The balance column already tracks what's unpaid per invoice
+        $totalOutstanding = Invoice::sum('balance');
+
+        // Daily transactions for modal
+        $todayPayments = Payment::whereDate('payment_date', today())->get();
+        $todayExpenses = Expense::whereDate('expense_date', today())->get();
 
         return view('finance.summary', [
             'totalIncome' => $totalIncome,
             'totalExpenses' => $totalExpenses,
             'totalExpected' => $totalExpected,
-            'balanceFees' => max(0, $totalExpected - $totalIncome),
+            'totalOutstanding' => $totalOutstanding,  // ✅ Pass this to view
             'netProfit' => $totalIncome - $totalExpenses,
             'totalStudents' => Student::when($studentType, function ($q) use ($studentType) {
                 $q->where('student_type', $studentType);
             })->count(),
             'studentType' => $studentType,
+            'todayPayments' => $todayPayments,
+            'todayExpenses' => $todayExpenses,
         ]);
     }
 
@@ -46,6 +62,7 @@ class FinanceController extends Controller
     |--------------------------------------------------------------------------
     | PAYMENTS
     |--------------------------------------------------------------------------
+    |
     */
     public function payments(Request $request)
     {
@@ -83,6 +100,7 @@ class FinanceController extends Controller
     |--------------------------------------------------------------------------
     | INCOME
     |--------------------------------------------------------------------------
+    |
     */
     public function income()
     {
@@ -98,8 +116,9 @@ class FinanceController extends Controller
 
     /*
     |--------------------------------------------------------------------------
-    | INVOICES (FIXED — NO ERRORS + NO DUPLICATION)
+    | INVOICES
     |--------------------------------------------------------------------------
+    |
     */
     public function invoices()
     {
@@ -109,10 +128,7 @@ class FinanceController extends Controller
             'student'
         ])->latest()->get();
 
-        // GROUP BY CLASS (FIXES DUPLICATES)
         $groupedInvoices = $invoices->groupBy('class_id');
-
-        // PRELOAD STUDENTS (NO DB QUERY IN BLADE)
         $studentsByClass = Student::all()->groupBy('class_id');
 
         return view('finance.invoices', compact('groupedInvoices', 'studentsByClass'));
@@ -122,6 +138,7 @@ class FinanceController extends Controller
     |--------------------------------------------------------------------------
     | CLASSES
     |--------------------------------------------------------------------------
+    |
     */
     public function classes()
     {
@@ -136,35 +153,67 @@ class FinanceController extends Controller
     |--------------------------------------------------------------------------
     | CLASS STUDENTS
     |--------------------------------------------------------------------------
+    |
     */
-    public function classStudents($classId)
+    public function classStudents(Request $request, $classId)
     {
-        $students = Student::with('schoolClass')
-            ->withSum('payments', 'amount_paid')
-            ->where('class_id', $classId)
-            ->get();
+        // 1. Load Filter variables for the Blade template to use
+        $classes = SchoolClass::orderBy('name')->get();
+        
+        // Safeguard section retrieval if your model varies:
+        $sections = class_exists(Section::class) ? Section::all() : collect();
 
-        return view('finance.students', compact('students', 'classId'));
+        // 2. Query data with filters applied
+        $query = Student::with('schoolClass')
+            ->withSum('payments', 'amount_paid')
+            ->where('class_id', $classId);
+
+        if ($request->filled('section_id')) {
+            $query->where('section_id', $request->section_id);
+        }
+
+        $students = $query->get();
+
+        return view('finance.students', compact('students', 'classId', 'classes', 'sections'));
     }
 
     /*
     |--------------------------------------------------------------------------
-    | ALL STUDENTS
+    | ALL STUDENTS (With URL Filter Logic Embedded)
     |--------------------------------------------------------------------------
+    |
     */
-    public function students()
+    public function students(Request $request)
     {
-        $students = Student::with('schoolClass')
-            ->withSum('payments', 'amount_paid')
-            ->get();
+        // 1. Fetch data for the filter dropdowns (Fixes the undefined variable error!)
+        $classes = SchoolClass::orderBy('name')->get();
+        
+        // Safeguard section retrieval if your model varies:
+        $sections = class_exists(Section::class) ? Section::all() : collect();
 
-        return view('finance.students', compact('students'));
+        // 2. Query structure for tracking results
+        $query = Student::with('schoolClass')
+            ->withSum('payments', 'amount_paid');
+
+        // 3. Conditional Filter Applications
+        if ($request->filled('class_id')) {
+            $query->where('class_id', $request->class_id);
+        }
+
+        if ($request->filled('section_id')) {
+            $query->where('section_id', $request->section_id);
+        }
+
+        $students = $query->get();
+
+        return view('finance.students', compact('students', 'classes', 'sections'));
     }
 
     /*
     |--------------------------------------------------------------------------
     | EXPENSES
     |--------------------------------------------------------------------------
+    |
     */
     public function expenses()
     {
@@ -178,23 +227,56 @@ class FinanceController extends Controller
 
     /*
     |--------------------------------------------------------------------------
-    | DAILY TRANSACTIONS
+    | DAILY TRANSACTIONS (AJAX)
     |--------------------------------------------------------------------------
+    |
     */
     public function dailyTransactions(Request $request)
     {
         $date = $request->date ?? now()->toDateString();
 
+        $payments = Payment::with('student')
+            ->whereDate('payment_date', $date)
+            ->get()
+            ->map(function ($payment) {
+                return [
+                    'receipt_no' => $payment->receipt_no,
+                    'student_name' => ($payment->student->first_name ?? '') . ' ' . ($payment->student->last_name ?? ''),
+                    'student_id' => $payment->student->student_id ?? '',
+                    'amount_paid' => $payment->amount_paid,
+                    'payment_method' => $payment->payment_method,
+                    'payment_date' => \Carbon\Carbon::parse($payment->payment_date)->format('M d, Y'),
+                    'time' => \Carbon\Carbon::parse($payment->created_at)->format('h:i A'),
+                ];
+            });
+
+        $expenses = Expense::whereDate('expense_date', $date)
+            ->get()
+            ->map(function ($expense) {
+                return [
+                    'title' => $expense->title,
+                    'category' => $expense->category,
+                    'amount' => $expense->amount,
+                    'description' => $expense->description,
+                    'expense_date' => $expense->expense_date ? \Carbon\Carbon::parse($expense->expense_date)->format('M d, Y') : 'N/A',
+                    'time' => \Carbon\Carbon::parse($expense->created_at)->format('h:i A'),
+                ];
+            });
+
         return response()->json([
-            'payments' => Payment::whereDate('created_at', $date)->get(),
-            'expenses' => Expense::whereDate('created_at', $date)->get(),
+            'success' => true,
+            'payments' => $payments,
+            'expenses' => $expenses,
+            'totalPayments' => $payments->sum('amount_paid'),
+            'totalExpenses' => $expenses->sum('amount'),
         ]);
     }
 
     /*
     |--------------------------------------------------------------------------
-    | STUDENT INVOICE (FIXED SAFELY)
+    | STUDENT INVOICE
     |--------------------------------------------------------------------------
+    |
     */
     public function studentInvoice(Request $request, $invoiceId)
     {

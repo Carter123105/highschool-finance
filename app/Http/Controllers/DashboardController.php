@@ -9,7 +9,9 @@ use App\Models\Payment;
 use App\Models\Expense;
 use App\Models\SchoolClass;
 use App\Models\AcademicYear;
+use App\Models\Section;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
 
 class DashboardController extends Controller
@@ -42,7 +44,7 @@ class DashboardController extends Controller
 
     /*
     |--------------------------------------------------
-    | ADMIN DASHBOARD
+    | ADMIN DASHBOARD - FIXED
     |--------------------------------------------------
     */
     public function admin()
@@ -54,6 +56,7 @@ class DashboardController extends Controller
         $totalStudents = Student::count();
         $activeStudents = Student::where('status', 'Active')->count();
 
+        /* ================= INVOICES ================= */
         $invoiceQuery = Invoice::when($yearId, fn($q) =>
             $q->where('academic_year_id', $yearId)
         );
@@ -63,8 +66,7 @@ class DashboardController extends Controller
         $unpaidInvoices = (clone $invoiceQuery)->where('status', 'Unpaid')->count();
         $partialInvoices = (clone $invoiceQuery)->where('status', 'Partial')->count();
 
-        $totalInvoiceAmount = (clone $invoiceQuery)->sum('total_amount');
-
+        /* ================= PAYMENTS ================= */
         $paymentQuery = Payment::whereHas('invoice', fn($q) =>
             $q->when($yearId, fn($sub) =>
                 $sub->where('academic_year_id', $yearId)
@@ -82,13 +84,24 @@ class DashboardController extends Controller
             ->whereYear('payment_date', now()->year)
             ->sum('amount_paid');
 
+        /* ================= EXPENSES ================= */
         $totalExpenses = Expense::when($yearId, fn($q) =>
             $q->where('academic_year_id', $yearId)
         )->sum('amount');
 
+        /* ================= REVENUE ================= */
         $totalRevenue = $totalPayments;
 
-        $outstandingBalance = max(0, $totalInvoiceAmount - $totalRevenue);
+        /* ================= OUTSTANDING BALANCE - FIXED ================= */
+        $outstandingBalance = $this->calculateOutstandingBalance($yearId);
+
+        /* ================= STUDENT PAYMENT STATUS - FIXED ================= */
+        $studentStats = $this->calculateStudentPaymentStats($yearId);
+        
+        $fullyPaidStudents = $studentStats['fully_paid'];
+        $partiallyPaidStudents = $studentStats['partially_paid'];
+        $neverPaidStudents = $studentStats['never_paid'];
+        $studentsOwing = $partiallyPaidStudents + $neverPaidStudents; // Total who still owe money
 
         return view('Admin.admin', compact(
             'totalStudents',
@@ -103,13 +116,17 @@ class DashboardController extends Controller
             'thisMonthPayments',
             'totalRevenue',
             'totalExpenses',
-            'outstandingBalance'
+            'outstandingBalance',
+            'fullyPaidStudents',
+            'partiallyPaidStudents',
+            'neverPaidStudents',
+            'studentsOwing'
         ));
     }
 
     /*
     |--------------------------------------------------
-    | ACCOUNTANT DASHBOARD (FULL FIXED)
+    | ACCOUNTANT DASHBOARD - FULLY FIXED
     |--------------------------------------------------
     */
     public function accountant()
@@ -134,44 +151,19 @@ class DashboardController extends Controller
             ->whereYear('payment_date', now()->year)
             ->sum('amount_paid');
 
-        /* ================= INVOICES ================= */
-        $invoiceQuery = Invoice::when($yearId, fn($q) =>
-            $q->where('academic_year_id', $yearId)
-        );
+        /* ================= OUTSTANDING BALANCE - FIXED ================= */
+        $outstandingBalance = $this->calculateOutstandingBalance($yearId);
 
-        $totalExpected = (clone $invoiceQuery)->sum('total_amount');
+        /* ================= TOTAL EXPECTED ================= */
+        $totalExpected = $this->calculateTotalExpected($yearId);
 
-        $outstandingBalance = max(0, $totalExpected - $totalRevenue);
-
-        /* ================= STUDENT ANALYSIS ================= */
-        $students = Student::with(['invoices.payments'])
-            ->when($yearId, fn($q) =>
-                $q->whereHas('invoices', fn($i) =>
-                    $i->where('academic_year_id', $yearId)
-                )
-            )
-            ->get();
-
-        $fullyPaidStudents = 0;
-        $studentsOwing = 0;
-
-        foreach ($students as $student) {
-
-            $invoices = $student->invoices->where('academic_year_id', $yearId);
-
-            $expected = $invoices->sum('total_amount');
-
-            $paid = 0;
-            foreach ($invoices as $invoice) {
-                $paid += $invoice->payments->sum('amount_paid');
-            }
-
-            if ($expected > 0 && $paid >= $expected) {
-                $fullyPaidStudents++;
-            } elseif ($expected > $paid) {
-                $studentsOwing++;
-            }
-        }
+        /* ================= STUDENT PAYMENT STATUS - FIXED ================= */
+        $studentStats = $this->calculateStudentPaymentStats($yearId);
+        
+        $fullyPaidStudents = $studentStats['fully_paid'];
+        $partiallyPaidStudents = $studentStats['partially_paid'];
+        $neverPaidStudents = $studentStats['never_paid'];
+        $studentsOwing = $partiallyPaidStudents + $neverPaidStudents;
 
         /* ================= RECENT PAYMENTS ================= */
         $recentPayments = Payment::with(['student', 'invoice'])
@@ -192,6 +184,8 @@ class DashboardController extends Controller
             'outstandingBalance',
             'recentPayments',
             'fullyPaidStudents',
+            'partiallyPaidStudents',
+            'neverPaidStudents',
             'studentsOwing'
         ));
     }
@@ -212,5 +206,203 @@ class DashboardController extends Controller
             'totalClasses' => SchoolClass::count(),
             'recentStudents' => Student::latest()->take(10)->get(),
         ]);
+    }
+
+    /*
+    |--------------------------------------------------
+    | FIXED: Calculate Outstanding Balance Per Student
+    |--------------------------------------------------
+    */
+    private function calculateOutstandingBalance($yearId = null)
+    {
+        $totalOutstanding = 0;
+
+        /* === CLASS INVOICES (student_id = NULL) === */
+        $classInvoiceQuery = Invoice::whereNull('student_id')
+            ->whereIn('status', ['Unpaid', 'Partial']);
+
+        if ($yearId) {
+            $classInvoiceQuery->where('academic_year_id', $yearId);
+        }
+
+        $classInvoices = $classInvoiceQuery->get();
+
+        foreach ($classInvoices as $invoice) {
+            $studentQuery = Student::where('class_id', $invoice->class_id);
+
+            if ($invoice->student_type) {
+                $studentQuery->where('student_type', $invoice->student_type);
+            }
+
+            if ($invoice->section_id) {
+                $studentQuery->where('section_id', $invoice->section_id);
+            }
+
+            $students = $studentQuery->get();
+
+            foreach ($students as $student) {
+                $paid = Payment::where('invoice_id', $invoice->id)
+                    ->where('student_id', $student->id)
+                    ->sum('amount_paid');
+
+                $remaining = max(0, $invoice->total_amount - $paid);
+                $totalOutstanding += $remaining;
+            }
+        }
+
+        /* === INDIVIDUAL INVOICES (student_id != NULL) === */
+        $individualInvoiceQuery = Invoice::whereNotNull('student_id')
+            ->whereIn('status', ['Unpaid', 'Partial']);
+
+        if ($yearId) {
+            $individualInvoiceQuery->where('academic_year_id', $yearId);
+        }
+
+        $individualInvoices = $individualInvoiceQuery->get();
+
+        foreach ($individualInvoices as $invoice) {
+            $paid = Payment::where('invoice_id', $invoice->id)->sum('amount_paid');
+            $remaining = max(0, $invoice->total_amount - $paid);
+            $totalOutstanding += $remaining;
+        }
+
+        return $totalOutstanding;
+    }
+
+    /*
+    |--------------------------------------------------
+    | FIXED: Calculate Total Expected Revenue
+    |--------------------------------------------------
+    */
+    private function calculateTotalExpected($yearId = null)
+    {
+        $totalExpected = 0;
+
+        /* === CLASS INVOICES === */
+        $classInvoiceQuery = Invoice::whereNull('student_id');
+
+        if ($yearId) {
+            $classInvoiceQuery->where('academic_year_id', $yearId);
+        }
+
+        $classInvoices = $classInvoiceQuery->get();
+
+        foreach ($classInvoices as $invoice) {
+            $studentQuery = Student::where('class_id', $invoice->class_id);
+
+            if ($invoice->student_type) {
+                $studentQuery->where('student_type', $invoice->student_type);
+            }
+
+            if ($invoice->section_id) {
+                $studentQuery->where('section_id', $invoice->section_id);
+            }
+
+            $studentCount = $studentQuery->count();
+            $totalExpected += ($invoice->total_amount * $studentCount);
+        }
+
+        /* === INDIVIDUAL INVOICES === */
+        $individualQuery = Invoice::whereNotNull('student_id');
+
+        if ($yearId) {
+            $individualQuery->where('academic_year_id', $yearId);
+        }
+
+        $totalExpected += $individualQuery->sum('total_amount');
+
+        return $totalExpected;
+    }
+
+    /*
+    |--------------------------------------------------
+    | FIXED: Calculate Student Payment Status Counts
+    |--------------------------------------------------
+    */
+    private function calculateStudentPaymentStats($yearId = null)
+    {
+        $fullyPaid = 0;
+        $partiallyPaid = 0;
+        $neverPaid = 0;
+
+        // Get all students
+        $students = Student::all();
+
+        foreach ($students as $student) {
+            // Find all invoices applicable to this student
+            $applicableInvoices = $this->getApplicableInvoices($student, $yearId);
+
+            if ($applicableInvoices->isEmpty()) {
+                continue; // No invoices for this student
+            }
+
+            $totalExpected = 0;
+            $totalPaid = 0;
+
+            foreach ($applicableInvoices as $invoice) {
+                $totalExpected += $invoice->total_amount;
+
+                $paid = Payment::where('invoice_id', $invoice->id)
+                    ->where('student_id', $student->id)
+                    ->sum('amount_paid');
+
+                $totalPaid += $paid;
+            }
+
+            if ($totalExpected <= 0) {
+                continue;
+            }
+
+            if ($totalPaid >= $totalExpected) {
+                $fullyPaid++;
+            } elseif ($totalPaid > 0) {
+                $partiallyPaid++;
+            } else {
+                $neverPaid++;
+            }
+        }
+
+        return [
+            'fully_paid' => $fullyPaid,
+            'partially_paid' => $partiallyPaid,
+            'never_paid' => $neverPaid,
+        ];
+    }
+
+    /*
+    |--------------------------------------------------
+    | HELPER: Get invoices applicable to a student
+    |--------------------------------------------------
+    */
+    private function getApplicableInvoices($student, $yearId = null)
+    {
+        $query = Invoice::query();
+
+        if ($yearId) {
+            $query->where('academic_year_id', $yearId);
+        }
+
+        return $query->where(function ($q) use ($student) {
+            // Individual invoices for this student
+            $q->where('student_id', $student->id);
+
+            // OR class invoices matching student's class/type/section
+            $q->orWhere(function ($sub) use ($student) {
+                $sub->whereNull('student_id')
+                    ->where('class_id', $student->class_id);
+
+                // Only include if student_type matches (if specified on invoice)
+                $sub->where(function ($typeQ) use ($student) {
+                    $typeQ->whereNull('student_type')
+                          ->orWhere('student_type', $student->student_type);
+                });
+
+                // Only include if section matches (if specified on invoice)
+                $sub->where(function ($secQ) use ($student) {
+                    $secQ->whereNull('section_id')
+                          ->orWhere('section_id', $student->section_id);
+                });
+            });
+        })->get();
     }
 }

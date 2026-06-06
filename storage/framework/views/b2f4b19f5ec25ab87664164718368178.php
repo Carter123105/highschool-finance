@@ -75,14 +75,22 @@
         padding-bottom: 3rem;
     }
 
-    /* Header Section */
+    /* Header Section - Enhanced Mobile Presentation */
     .page-header {
         background: linear-gradient(135deg, var(--dark) 0%, #0f172a 100%);
-        border-radius: var(--radius-xl);
-        padding: 2rem 2.5rem;
-        margin-bottom: 2rem;
+        border-radius: var(--radius-lg);
+        padding: 1.25rem 1.25rem;
+        margin-bottom: 1.5rem;
         position: relative;
         overflow: hidden;
+    }
+
+    @media (min-width: 768px) {
+        .page-header {
+            border-radius: var(--radius-xl);
+            padding: 2rem 2.5rem;
+            margin-bottom: 2rem;
+        }
     }
 
     .page-header::before {
@@ -99,10 +107,14 @@
     .page-header h2 {
         color: #fff;
         font-weight: 700;
-        font-size: 1.75rem;
+        font-size: 1.4rem;
         margin-bottom: 0.25rem;
         position: relative;
         z-index: 1;
+    }
+
+    @media (min-width: 768px) {
+        .page-header h2 { font-size: 1.75rem; }
     }
 
     .page-header p {
@@ -110,6 +122,11 @@
         margin: 0;
         position: relative;
         z-index: 1;
+        font-size: 0.85rem;
+    }
+    
+    @media (min-width: 768px) {
+        .page-header p { font-size: 1rem; }
     }
 
     .header-actions {
@@ -136,7 +153,7 @@
         box-shadow: 0 6px 20px rgba(99, 102, 241, 0.5);
     }
 
-    /* Academic Year Switcher */
+    /* Academic Year Switcher Dropdown styling */
     .year-switcher {
         position: relative;
         z-index: 1;
@@ -251,31 +268,34 @@
         margin-left: 0.5rem;
     }
 
-    /* KPI Cards */
+    /* KPI Cards - Structured Mobile Layout */
     .kpi-grid {
         display: grid;
-        grid-template-columns: repeat(4, 1fr);
-        gap: 1.5rem;
-        margin-bottom: 2rem;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 1rem;
+        margin-bottom: 1.5rem;
     }
 
-    @media (max-width: 1200px) {
-        .kpi-grid { grid-template-columns: repeat(2, 1fr); }
-    }
-
-    @media (max-width: 576px) {
-        .kpi-grid { grid-template-columns: 1fr; }
+    @media (min-width: 992px) {
+        .kpi-grid {
+            grid-template-columns: repeat(4, 1fr);
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
     }
 
     .kpi-card {
         background: #fff;
         border-radius: var(--radius-lg);
-        padding: 1.5rem;
+        padding: 1.25rem;
         box-shadow: var(--shadow);
         border: 1px solid var(--gray-100);
         transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         position: relative;
         overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
     }
 
     .kpi-card::after {
@@ -308,18 +328,27 @@
     .kpi-header {
         display: flex;
         justify-content: space-between;
-        align-items: flex-start;
-        margin-bottom: 1rem;
+        align-items: center;
+        margin-bottom: 0.75rem;
     }
 
     .kpi-icon {
-        width: 48px;
-        height: 48px;
-        border-radius: var(--radius);
+        width: 38px;
+        height: 38px;
+        border-radius: var(--radius-sm);
         display: flex;
         align-items: center;
         justify-content: center;
-        font-size: 1.25rem;
+        font-size: 1rem;
+    }
+
+    @media (min-width: 768px) {
+        .kpi-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: var(--radius);
+            font-size: 1.25rem;
+        }
     }
 
     .kpi-icon.primary {
@@ -345,11 +374,17 @@
     .kpi-trend {
         display: inline-flex;
         align-items: center;
-        /* gap: 0.25rem; */
-        font-size: 0.75rem;
+        font-size: 0.7rem;
         font-weight: 600;
-        padding: 0.25rem 0.5rem;
+        padding: 0.15rem 0.4rem;
         border-radius: var(--radius-sm);
+    }
+
+    @media (min-width: 768px) {
+        .kpi-trend {
+            font-size: 0.75rem;
+            padding: 0.25rem 0.5rem;
+        }
     }
 
     .kpi-trend.up {
@@ -363,31 +398,43 @@
     }
 
     .kpi-value {
-        font-size: 1.875rem;
-        font-weight: 600;
+        font-size: 1.35rem;
+        font-weight: 700;
         color: var(--gray-800);
         line-height: 1.2;
         margin-bottom: 0.25rem;
         letter-spacing: -0.025em;
     }
 
-    .kpi-label {
-        font-size: 0.875rem;
-        color: var(--gray-500);
-        font-weight: 500;
+    @media (min-width: 768px) {
+        .kpi-value { font-size: 1.875rem; }
     }
 
-    /* Cards */
+    .kpi-label {
+        font-size: 0.75rem;
+        color: var(--gray-500);
+        font-weight: 500;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    @media (min-width: 768px) {
+        .kpi-label { font-size: 0.875rem; }
+    }
+
+    /* Cards Layout */
     .modern-card {
         background: #fff;
         border-radius: var(--radius-lg);
         box-shadow: var(--shadow);
         border: 1px solid var(--gray-100);
         overflow: hidden;
+        height: 100%;
     }
 
     .modern-card-header {
-        padding: 1.25rem 1.5rem;
+        padding: 1rem 1.25rem;
         border-bottom: 1px solid var(--gray-100);
         display: flex;
         justify-content: space-between;
@@ -396,7 +443,7 @@
     }
 
     .modern-card-title {
-        font-size: 1rem;
+        font-size: 0.95rem;
         font-weight: 700;
         color: var(--gray-800);
         display: flex;
@@ -404,16 +451,20 @@
         gap: 0.5rem;
     }
 
+    @media (min-width: 768px) {
+        .modern-card-title { font-size: 1rem; }
+    }
+
     .modern-card-title .icon {
-        width: 32px;
-        height: 32px;
-        border-radius: var(--radius);
+        width: 28px;
+        height: 28px;
+        border-radius: var(--radius-sm);
         background: rgba(99, 102, 241, 0.1);
         color: var(--primary);
         display: flex;
         align-items: center;
         justify-content: center;
-        font-size: 0.875rem;
+        font-size: 0.8rem;
     }
 
     .badge-count {
@@ -421,11 +472,11 @@
         color: var(--gray-600);
         font-size: 0.75rem;
         font-weight: 700;
-        padding: 0.25rem 0.75rem;
+        padding: 0.25rem 0.5rem;
         border-radius: 9999px;
     }
 
-    /* Table */
+    /* Table & Optimization For Touch Targets */
     .modern-table {
         width: 100%;
         border-collapse: separate;
@@ -439,7 +490,7 @@
         font-weight: 700;
         text-transform: uppercase;
         letter-spacing: 0.05em;
-        padding: 0.875rem 1.5rem;
+        padding: 0.875rem 1rem;
         border-bottom: 1px solid var(--gray-200);
         white-space: nowrap;
     }
@@ -453,39 +504,34 @@
     }
 
     .modern-table tbody td {
-        padding: 1rem 1.5rem;
+        padding: 0.875rem 1rem;
         border-bottom: 1px solid var(--gray-100);
         color: var(--gray-700);
-        font-size: 0.875rem;
+        font-size: 0.85rem;
         vertical-align: middle;
-    }
-
-    .modern-table tbody tr:last-child td {
-        border-bottom: none;
     }
 
     .invoice-id {
         font-weight: 700;
         color: var(--gray-800);
-        font-size: 0.875rem;
     }
 
     .student-info {
         display: flex;
         align-items: center;
-        gap: 0.75rem;
+        gap: 0.5rem;
     }
 
     .student-avatar {
-        width: 36px;
-        height: 36px;
+        width: 32px;
+        height: 32px;
         border-radius: 50%;
         background: linear-gradient(135deg, var(--primary), var(--primary-dark));
         color: #fff;
         display: flex;
         align-items: center;
         justify-content: center;
-        font-size: 0.75rem;
+        font-size: 0.7rem;
         font-weight: 700;
         flex-shrink: 0;
     }
@@ -493,16 +539,17 @@
     .student-name {
         font-weight: 600;
         color: var(--gray-800);
+        white-space: nowrap;
     }
 
     .student-meta {
-        font-size: 0.75rem;
+        font-size: 0.7rem;
         color: var(--gray-400);
     }
 
     .amount {
         font-weight: 700;
-        font-size: 0.9375rem;
+        font-size: 0.875rem;
         font-variant-numeric: tabular-nums;
     }
 
@@ -515,17 +562,16 @@
         display: inline-flex;
         align-items: center;
         gap: 0.375rem;
-        padding: 0.375rem 0.875rem;
+        padding: 0.25rem 0.625rem;
         border-radius: 9999px;
-        font-size: 0.75rem;
+        font-size: 0.7rem;
         font-weight: 700;
-        letter-spacing: 0.025em;
     }
 
     .status-badge::before {
         content: '';
-        width: 6px;
-        height: 6px;
+        width: 5px;
+        height: 5px;
         border-radius: 50%;
         display: inline-block;
     }
@@ -550,43 +596,38 @@
 
     /* Payment Items */
     .payment-list {
-        padding: 0.5rem 0;
+        padding: 0.25rem 0;
     }
 
     .payment-item {
         display: flex;
         align-items: center;
         justify-content: space-between;
-        padding: 1rem 1.5rem;
+        padding: 0.875rem 1.25rem;
         border-bottom: 1px solid var(--gray-100);
         transition: all 0.2s ease;
-        cursor: pointer;
     }
 
     .payment-item:last-child {
         border-bottom: none;
     }
 
-    .payment-item:hover {
-        background: var(--gray-50);
-    }
-
     .payment-left {
         display: flex;
         align-items: center;
-        gap: 1rem;
+        gap: 0.75rem;
     }
 
     .payment-icon {
-        width: 40px;
-        height: 40px;
-        border-radius: var(--radius);
+        width: 34px;
+        height: 34px;
+        border-radius: var(--radius-sm);
         background: rgba(16, 185, 129, 0.1);
         color: var(--success);
         display: flex;
         align-items: center;
         justify-content: center;
-        font-size: 1rem;
+        font-size: 0.85rem;
         flex-shrink: 0;
     }
 
@@ -598,11 +639,11 @@
     .payment-id {
         font-weight: 700;
         color: var(--gray-800);
-        font-size: 0.875rem;
+        font-size: 0.85rem;
     }
 
     .payment-time {
-        font-size: 0.75rem;
+        font-size: 0.7rem;
         color: var(--gray-400);
         margin-top: 0.125rem;
     }
@@ -610,50 +651,43 @@
     .payment-amount {
         font-weight: 800;
         color: var(--success);
-        font-size: 1rem;
+        font-size: 0.9rem;
         font-variant-numeric: tabular-nums;
     }
 
     .view-all {
         display: block;
         text-align: center;
-        padding: 1rem;
+        padding: 0.875rem;
         color: var(--primary);
         font-weight: 600;
-        font-size: 0.875rem;
+        font-size: 0.85rem;
         text-decoration: none;
         border-top: 1px solid var(--gray-100);
-        transition: background 0.2s ease;
-    }
-
-    .view-all:hover {
-        background: var(--gray-50);
-        color: var(--primary-dark);
     }
 
     /* Empty State */
     .empty-state {
         text-align: center;
-        padding: 3rem 1.5rem;
+        padding: 2.5rem 1.25rem;
         color: var(--gray-400);
     }
 
     .empty-state i {
-        font-size: 3rem;
-        margin-bottom: 1rem;
+        font-size: 2.5rem;
+        margin-bottom: 0.75rem;
         color: var(--gray-300);
     }
 
     .empty-state p {
-        font-size: 0.875rem;
-        margin: 0;
+        font-size: 0.85rem;
     }
 
     /* Animations */
     @keyframes fadeInUp {
         from {
             opacity: 0;
-            transform: translateY(20px);
+            transform: translateY(12px);
         }
         to {
             opacity: 1;
@@ -662,47 +696,46 @@
     }
 
     .animate-in {
-        animation: fadeInUp 0.6s ease-out forwards;
+        animation: fadeInUp 0.4s ease-out forwards;
     }
 
-    .delay-1 { animation-delay: 0.1s; }
-    .delay-2 { animation-delay: 0.2s; }
-    .delay-3 { animation-delay: 0.3s; }
-    .delay-4 { animation-delay: 0.4s; }
+    .delay-1 { animation-delay: 0.05s; }
+    .delay-2 { animation-delay: 0.1s; }
+    .delay-3 { animation-delay: 0.15s; }
+    .delay-4 { animation-delay: 0.2s; }
 </style>
 
-<div class="container-fluid py-4 dashboard-wrapper">
+<div class="container-fluid px-3 py-3 py-md-4 dashboard-wrapper">
 
     
     <div class="page-header animate-in">
-        <div class="row align-items-center">
-            <div class="col-md-6">
+        <div class="row align-items-center g-3">
+            <div class="col-12 col-md-6">
                 <h2>Finance Dashboard</h2>
                 <p>School Accounting & Financial Management System</p>
             </div>
-            <div class="col-md-6 text-md-end mt-3 mt-md-0 header-actions">
-                <div class="d-flex justify-content-md-end align-items-center gap-2 flex-wrap">
+            <div class="col-12 col-md-6 header-actions">
+                <div class="d-flex justify-content-start justify-content-md-end align-items-center gap-2 flex-wrap">
                     
                     
-                   <form action="<?php echo e(route('dashboard.set-year')); ?>" method="POST" class="d-flex align-items-center gap-2">
-    <?php echo csrf_field(); ?>
+                    <form action="<?php echo e(route('dashboard.set-year')); ?>" method="POST" class="d-flex align-items-center gap-2 flex-grow-1 flex-md-grow-0">
+                        <?php echo csrf_field(); ?>
+                        <select name="academic_year_id" class="form-select form-select-sm" style="min-width: 140px;">
+                            <?php $__currentLoopData = $academicYears; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $year): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                                <option value="<?php echo e($year->id); ?>"
+                                    <?php echo e(session('academic_year_id') == $year->id ? 'selected' : ''); ?>>
+                                    <?php echo e($year->name); ?>
 
-    <select name="academic_year_id" class="form-select form-select-sm">
-        <?php $__currentLoopData = $academicYears; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $year): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
-            <option value="<?php echo e($year->id); ?>"
-                <?php echo e(session('academic_year_id') == $year->id ? 'selected' : ''); ?>>
-                <?php echo e($year->name); ?>
+                                </option>
+                            <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+                        </select>
 
-            </option>
-        <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
-    </select>
+                        <button type="submit" class="btn btn-primary btn-sm text-nowrap">
+                            Set Year
+                        </button>
+                    </form>
 
-    <button type="submit" class="btn btn-primary btn-sm">
-        Set Year
-    </button>
-</form>
-
-                    <a href="<?php echo e(route('invoices.create')); ?>" class="btn btn-primary-modern text-white">
+                    <a href="<?php echo e(route('invoices.create')); ?>" class="btn btn-primary-modern btn-sm text-white flex-grow-1 flex-md-grow-0 text-center">
                         <span>+ New Invoice</span>
                     </a>
                 </div>
@@ -721,8 +754,10 @@
                     <i class="fas fa-arrow-up" style="font-size: 0.625rem;"></i> 12%
                 </span>
             </div>
-            <div class="kpi-value"><?php echo e(number_format($totalStudents)); ?></div>
-            <div class="kpi-label">Total Students</div>
+            <div>
+                <div class="kpi-value"><?php echo e(number_format($totalStudents)); ?></div>
+                <div class="kpi-label">Total Students</div>
+            </div>
         </div>
 
         <div class="kpi-card success animate-in delay-2">
@@ -734,8 +769,10 @@
                     <i class="fas fa-arrow-up" style="font-size: 0.625rem;"></i> 8.5%
                 </span>
             </div>
-            <div class="kpi-value">$<?php echo e(number_format($totalRevenue, 2)); ?></div>
-            <div class="kpi-label">Total Revenue</div>
+            <div>
+                <div class="kpi-value">$<?php echo e(number_format($totalRevenue, 2)); ?></div>
+                <div class="kpi-label">Total Revenue</div>
+            </div>
         </div>
 
         <div class="kpi-card danger animate-in delay-3">
@@ -747,8 +784,10 @@
                     <i class="fas fa-arrow-down" style="font-size: 0.625rem;"></i> 3.2%
                 </span>
             </div>
-            <div class="kpi-value">$<?php echo e(number_format($outstandingBalance, 2)); ?></div>
-            <div class="kpi-label">Outstanding Balance</div>
+            <div>
+                <div class="kpi-value">$<?php echo e(number_format($outstandingBalance, 2)); ?></div>
+                <div class="kpi-label">Outstanding Balance</div>
+            </div>
         </div>
 
         <div class="kpi-card warning animate-in delay-4">
@@ -760,8 +799,10 @@
                     <i class="fas fa-arrow-up" style="font-size: 0.625rem;"></i> 2.1%
                 </span>
             </div>
-            <div class="kpi-value"><?php echo e(number_format($totalUsers)); ?></div>
-            <div class="kpi-label">System Users</div>
+            <div>
+                <div class="kpi-value"><?php echo e(number_format($totalUsers)); ?></div>
+                <div class="kpi-label">System Users</div>
+            </div>
         </div>
     </div>
 
@@ -769,14 +810,14 @@
     <div class="row g-4">
         
         
-        <div class="col-lg-8 animate-in delay-2">
+        <div class="col-12 col-xl-8 animate-in delay-2">
             <div class="modern-card">
-                <div class="modern-card-header">
-                    <div class="modern-card-title">
+                <div class="modern-card-header flex-column flex-sm-row align-items-start align-items-sm-center gap-2">
+                    <div class="modern-card-title flex-wrap">
                         <span class="icon"><i class="fas fa-file-invoice-dollar"></i></span>
                         Recent Invoices
                         <?php if($selectedYear): ?>
-                            <span class="year-badge">
+                            <span class="year-badge mt-1 mt-sm-0">
                                 <i class="fas fa-calendar"></i> <?php echo e($selectedYearName); ?>
 
                             </span>
@@ -836,7 +877,7 @@
 
                                                     </div>
                                                     <div class="student-meta">
-                                                        Student ID: <?php echo e($student->id ?? 'N/A'); ?>
+                                                        ID: <?php echo e($student->id ?? 'N/A'); ?>
 
                                                     </div>
                                                 </div>
@@ -872,7 +913,7 @@
         </div>
 
         
-        <div class="col-lg-4 animate-in delay-3">
+        <div class="col-12 col-xl-4 animate-in delay-3">
             <div class="modern-card">
                 <div class="modern-card-header">
                     <div class="modern-card-title">
@@ -880,12 +921,6 @@
                             <i class="fas fa-credit-card"></i>
                         </span>
                         Recent Payments
-                        <?php if($selectedYear): ?>
-                            <span class="year-badge">
-                                <i class="fas fa-calendar"></i> <?php echo e($selectedYearName); ?>
-
-                            </span>
-                        <?php endif; ?>
                     </div>
                     <span class="badge-count"><?php echo e(count($recentPayments)); ?> new</span>
                 </div>
@@ -943,13 +978,11 @@
     document.addEventListener('click', function(event) {
         const switcher = document.querySelector('.year-switcher');
         const dropdown = document.getElementById('yearDropdown');
-        if (!switcher.contains(event.target)) {
+        if (switcher && dropdown && !switcher.contains(event.target)) {
             dropdown.classList.remove('show');
         }
     });
 </script>
 
-<?php $__env->stopSection(); ?>'''
-
-
+<?php $__env->stopSection(); ?>
 <?php echo $__env->make('layouts.app', array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?><?php /**PATH C:\xampp\htdocs\highschool-finance\resources\views/Admin/admin.blade.php ENDPATH**/ ?>

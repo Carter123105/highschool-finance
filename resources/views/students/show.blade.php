@@ -20,7 +20,7 @@
 
         <div class="d-flex gap-2 mt-2 mt-md-0">
 
-            {{-- PAYMENTS BUTTON (NEW) --}}
+            {{-- FIXED: Student Payment History Route --}}
             <a href="{{ route('students.payments', $student->id) }}"
                class="btn btn-success btn-sm">
 
@@ -82,14 +82,12 @@
 
                         <div class="d-flex gap-2">
 
-                            {{-- STUDENT TYPE BADGE --}}
                             @if($student->student_type == 'New')
                                 <span class="badge bg-success px-3 py-2">New</span>
                             @elseif($student->student_type == 'Old')
                                 <span class="badge bg-warning text-dark px-3 py-2">Old</span>
                             @endif
 
-                            {{-- STATUS BADGE --}}
                             <span class="badge bg-primary px-3 py-2">
                                 {{ $student->status }}
                             </span>
@@ -117,15 +115,7 @@
                         <div class="col-md-6">
                             <div class="info-box">
                                 <small>Student Type</small>
-                                <h6>
-                                    @if($student->student_type == 'New')
-                                        <span class="text-success">● New Student</span>
-                                    @elseif($student->student_type == 'Old')
-                                        <span class="text-warning">● Returning Student</span>
-                                    @else
-                                        <span class="text-muted">N/A</span>
-                                    @endif
-                                </h6>
+                                <h6>{{ $student->student_type }}</h6>
                             </div>
                         </div>
 
@@ -189,6 +179,7 @@
 
                         </a>
 
+                        {{-- FIXED: Payment History Route --}}
                         <a href="{{ route('students.payments', $student->id) }}"
                            class="btn btn-success btn-sm">
 
@@ -216,12 +207,10 @@
     background:#f4f7fb;
 }
 
-/* CARD */
 .profile-card{
     border-radius:18px;
 }
 
-/* PHOTO */
 .profile-photo{
     display:flex;
     justify-content:center;
@@ -244,7 +233,6 @@
     font-size:32px;
 }
 
-/* INFO BOX */
 .info-box{
     background:#f8fafc;
     padding:12px 14px;
@@ -263,7 +251,6 @@
     color:#0f172a;
 }
 
-/* RESPONSIVE */
 @media(max-width:768px){
     .no-photo{
         width:120px;

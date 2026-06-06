@@ -10,7 +10,7 @@
 
     $yearId = session('academic_year_id');
 
-    // SAFE DEFAULTS (IMPORTANT FIX)
+    // SAFE DEFAULTS
     $recentPayments = $recentPayments ?? collect();
     $fullyPaidStudents = $fullyPaidStudents ?? 0;
     $studentsOwing = $studentsOwing ?? 0;
@@ -66,6 +66,13 @@
         height:100%;
     }
 
+    .table-box{
+        background:#fff;
+        border-radius:18px;
+        padding:20px;
+        box-shadow:0 4px 18px rgba(0,0,0,0.06);
+    }
+
     @media print{
         .btn,
         form{
@@ -82,7 +89,10 @@
         <div class="d-flex justify-content-between align-items-center flex-wrap">
 
             <div>
-                <h2 class="fw-bold mb-1">Accountant Dashboard</h2>
+                <h2 class="fw-bold mb-1">
+                    Accountant Dashboard
+                </h2>
+
                 <p class="mb-0 opacity-75">
                     Financial overview and payment tracking system
                 </p>
@@ -94,8 +104,11 @@
                     {{ $today }}
                 </div>
 
-                {{-- YEAR SWITCHER --}}
-                <form method="POST" action="{{ route('finance.set-year') }}" class="mt-2">
+                {{-- FIXED YEAR SWITCHER --}}
+                <form method="POST"
+                      action="{{ route('dashboard.set-year') }}"
+                      class="mt-2">
+
                     @csrf
 
                     <div class="d-flex gap-2 align-items-center">
@@ -104,9 +117,11 @@
                                 class="form-select form-select-sm"
                                 required>
 
-                            <option value="">Select Year</option>
+                            <option value="">
+                                Select Year
+                            </option>
 
-                            @foreach(AcademicYear::orderBy('id','desc')->get() as $year)
+                            @foreach(AcademicYear::orderBy('id', 'desc')->get() as $year)
 
                                 <option value="{{ $year->id }}"
                                     {{ $yearId == $year->id ? 'selected' : '' }}>
@@ -119,25 +134,45 @@
 
                         </select>
 
-                        <button type="submit" class="btn btn-light btn-sm">
+                        <button type="submit"
+                                class="btn btn-light btn-sm">
+
                             Save
+
                         </button>
 
                     </div>
+
                 </form>
 
-                <button onclick="window.print()" class="btn btn-light btn-sm mt-2">
-                    <i class="bi bi-printer"></i> Print Report
+                <button onclick="window.print()"
+                        class="btn btn-light btn-sm mt-2">
+
+                    <i class="bi bi-printer"></i>
+                    Print Report
+
                 </button>
 
             </div>
 
         </div>
 
+        {{-- SUCCESS MESSAGE --}}
         @if(session('success'))
+
             <div class="alert alert-success mt-3">
                 {{ session('success') }}
             </div>
+
+        @endif
+
+        {{-- ERROR MESSAGE --}}
+        @if(session('error'))
+
+            <div class="alert alert-danger mt-3">
+                {{ session('error') }}
+            </div>
+
         @endif
 
     </div>
@@ -146,103 +181,250 @@
     <div class="row g-4">
 
         <div class="col-xl-3 col-md-6">
+
             <div class="dashboard-card bg-white p-4 h-100">
+
                 <div class="d-flex justify-content-between">
+
                     <div>
-                        <div class="text-muted fw-semibold">Today's Revenue</div>
+
+                        <div class="text-muted fw-semibold">
+                            Today's Revenue
+                        </div>
+
                         <div class="stat-number text-success">
                             ${{ number_format($todayRevenue, 2) }}
                         </div>
+
                     </div>
+
                     <div class="card-icon bg-success bg-opacity-10 text-success">
                         <i class="bi bi-cash-stack"></i>
                     </div>
+
                 </div>
+
             </div>
+
         </div>
 
         <div class="col-xl-3 col-md-6">
+
             <div class="dashboard-card bg-white p-4 h-100">
+
                 <div class="d-flex justify-content-between">
+
                     <div>
-                        <div class="text-muted fw-semibold">Monthly Revenue</div>
+
+                        <div class="text-muted fw-semibold">
+                            Monthly Revenue
+                        </div>
+
                         <div class="stat-number text-primary">
                             ${{ number_format($monthlyRevenue, 2) }}
                         </div>
+
                     </div>
+
                     <div class="card-icon bg-primary bg-opacity-10 text-primary">
                         <i class="bi bi-bar-chart-line"></i>
                     </div>
+
                 </div>
+
             </div>
+
         </div>
 
         <div class="col-xl-3 col-md-6">
+
             <div class="dashboard-card bg-white p-4 h-100">
+
                 <div class="d-flex justify-content-between">
+
                     <div>
-                        <div class="text-muted fw-semibold">Outstanding Balance</div>
+
+                        <div class="text-muted fw-semibold">
+                            Outstanding Balance
+                        </div>
+
                         <div class="stat-number text-danger">
                             ${{ number_format($outstandingBalance, 2) }}
                         </div>
+
                     </div>
+
                     <div class="card-icon bg-danger bg-opacity-10 text-danger">
                         <i class="bi bi-exclamation-circle"></i>
                     </div>
+
                 </div>
+
             </div>
+
         </div>
 
         <div class="col-xl-3 col-md-6">
+
             <div class="dashboard-card bg-white p-4 h-100">
+
                 <div class="d-flex justify-content-between">
+
                     <div>
-                        <div class="text-muted fw-semibold">Total Revenue</div>
+
+                        <div class="text-muted fw-semibold">
+                            Total Revenue
+                        </div>
+
                         <div class="stat-number text-dark">
                             ${{ number_format($totalRevenue, 2) }}
                         </div>
+
                     </div>
+
                     <div class="card-icon bg-dark bg-opacity-10 text-dark">
                         <i class="bi bi-wallet2"></i>
                     </div>
+
                 </div>
+
             </div>
+
         </div>
 
     </div>
 
     {{-- SUMMARY --}}
-    {{-- SUMMARY --}}
-<div class="row g-4 mt-1">
+    <div class="row g-4 mt-1">
 
-    <div class="col-md-4">
-        <div class="summary-box">
-            <div class="text-muted fw-semibold">Total Payments</div>
-            <h3 class="fw-bold mt-2">
-                {{ $recentPayments->count() }}
-            </h3>
+        <div class="col-md-4">
+
+            <div class="summary-box">
+
+                <div class="text-muted fw-semibold">
+                    Total Payments
+                </div>
+
+                <h3 class="fw-bold mt-2">
+                    {{ $recentPayments->count() }}
+                </h3>
+
+            </div>
+
         </div>
+
+        <div class="col-md-4">
+
+            <div class="summary-box">
+
+                <div class="text-muted fw-semibold">
+                    Fully Paid Students
+                </div>
+
+                <h3 class="fw-bold mt-2 text-success">
+                    {{ $fullyPaidStudents }}
+                </h3>
+
+            </div>
+
+        </div>
+
+        <div class="col-md-4">
+
+            <div class="summary-box">
+
+                <div class="text-muted fw-semibold">
+                    Students Owing
+                </div>
+
+                <h3 class="fw-bold mt-2 text-danger">
+                    {{ $studentsOwing }}
+                </h3>
+
+            </div>
+
+        </div>
+
     </div>
 
-    <div class="col-md-4">
-        <div class="summary-box">
-            <div class="text-muted fw-semibold">Fully Paid Students</div>
-            <h3 class="fw-bold mt-2 text-success">
-                {{ $fullyPaidStudents }}
-            </h3>
+    {{-- RECENT PAYMENTS --}}
+    <div class="row mt-4">
+
+        <div class="col-12">
+
+            <div class="table-box">
+
+                <div class="d-flex justify-content-between align-items-center mb-3">
+
+                    <h5 class="fw-bold mb-0">
+                        Recent Payments
+                    </h5>
+
+                </div>
+
+                <div class="table-responsive">
+
+                    <table class="table align-middle">
+
+                        <thead class="table-light">
+
+                            <tr>
+                                <th>Student</th>
+                                <th>Invoice</th>
+                                <th>Amount</th>
+                                <th>Date</th>
+                            </tr>
+
+                        </thead>
+
+                        <tbody>
+
+                            @forelse($recentPayments as $payment)
+
+                                <tr>
+
+                                    <td>
+                                        {{ $payment->student->full_name ?? 'N/A' }}
+                                    </td>
+
+                                    <td>
+                                        {{ $payment->invoice->invoice_number ?? 'N/A' }}
+                                    </td>
+
+                                    <td class="fw-bold text-success">
+                                        ${{ number_format($payment->amount_paid, 2) }}
+                                    </td>
+
+                                    <td>
+                                        {{ \Carbon\Carbon::parse($payment->payment_date)->format('M d, Y') }}
+                                    </td>
+
+                                </tr>
+
+                            @empty
+
+                                <tr>
+
+                                    <td colspan="4" class="text-center text-muted py-4">
+                                        No recent payments found.
+                                    </td>
+
+                                </tr>
+
+                            @endforelse
+
+                        </tbody>
+
+                    </table>
+
+                </div>
+
+            </div>
+
         </div>
+
     </div>
 
-    <div class="col-md-4">
-        <div class="summary-box">
-            <div class="text-muted fw-semibold">Students Owing</div>
-            <h3 class="fw-bold mt-2 text-danger">
-                {{ $studentsOwing }}
-            </h3>
-        </div>
-    </div>
-
-</div>
 </div>
 
 @endsection

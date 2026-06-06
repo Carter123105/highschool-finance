@@ -5,9 +5,9 @@
     $income = $totalIncome ?? 0;
     $expenses = $totalExpenses ?? 0;
     $expected = $totalExpected ?? 0;
+    $outstandingFees = $totalOutstanding ?? 0;
 
     // CALCULATIONS
-    $balanceFees = $expected - $income;
     $netProfit = $income - $expenses;
 
     // DAILY TRANSACTIONS
@@ -64,7 +64,7 @@
         <div class="col-xl-3 col-md-6">
             <div class="stat-card income">
                 <div class="stat-icon"><i class="bi bi-cash-coin"></i></div>
-                <div>
+                <div class="stat-info">
                     <small>Total Income</small>
                     <h3>$<?php echo e(number_format($income, 2)); ?></h3>
                 </div>
@@ -75,7 +75,7 @@
         <div class="col-xl-3 col-md-6">
             <div class="stat-card expense">
                 <div class="stat-icon"><i class="bi bi-receipt"></i></div>
-                <div>
+                <div class="stat-info">
                     <small>Total Expenses</small>
                     <h3>$<?php echo e(number_format($expenses, 2)); ?></h3>
                 </div>
@@ -86,9 +86,12 @@
         <div class="col-xl-3 col-md-6">
             <div class="stat-card warning">
                 <div class="stat-icon"><i class="bi bi-graph-up-arrow"></i></div>
-                <div>
+                <div class="stat-info">
                     <small>Outstanding Fees</small>
-                    <h3>$<?php echo e(number_format($balanceFees, 2)); ?></h3>
+                    <h3 class="<?php echo e($outstandingFees > 0 ? 'text-warning' : 'text-success'); ?>">
+                        $<?php echo e(number_format($outstandingFees, 2)); ?>
+
+                    </h3>
                 </div>
             </div>
         </div>
@@ -97,7 +100,7 @@
         <div class="col-xl-3 col-md-6">
             <div class="stat-card profit">
                 <div class="stat-icon"><i class="bi bi-bar-chart-line"></i></div>
-                <div>
+                <div class="stat-info">
                     <small>Net Profit</small>
                     <h3 class="<?php echo e($netProfit >= 0 ? 'text-success' : 'text-danger'); ?>">
                         $<?php echo e(number_format($netProfit, 2)); ?>
@@ -524,30 +527,57 @@
     color: #1e40af;
 }
 
+/* ================= STAT CARDS - FIXED ================= */
 .stat-card {
     background: #fff;
     border-radius: 16px;
     padding: 20px;
     display: flex;
-    gap: -6px;
     align-items: center;
+    gap: 14px;
     box-shadow: 0 5px 18px rgba(0,0,0,.05);
 }
 
 .stat-icon {
-    width: 52px;
-    height: 52px;
-    border-radius: 14px;
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
     display: flex;
     align-items: center;
     justify-content: center;
     color: #fff;
+    flex-shrink: 0;
+    font-size: 20px;
 }
 
-.income .stat-icon { background: #16a34a; }
-.expense .stat-icon { background: #dc2626; }
-.warning .stat-icon { background: #f59e0b; }
-.profit .stat-icon { background: #2563eb; }
+.income .stat-icon { background: linear-gradient(135deg, #16a34a, #22c55e); }
+.expense .stat-icon { background: linear-gradient(135deg, #dc2626, #ef4444); }
+.warning .stat-icon { background: linear-gradient(135deg, #f59e0b, #facc15); }
+.profit .stat-icon { background: linear-gradient(135deg, #2563eb, #3b82f6); }
+
+.stat-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+
+.stat-info small {
+    font-size: 12px;
+    color: #64748b;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    line-height: 1;
+}
+
+.stat-info h3 {
+    font-size: 24px;
+    font-weight: 800;
+    margin: 0;
+    line-height: 1.2;
+    white-space: nowrap;
+}
 
 .report-card {
     display: flex;
@@ -643,6 +673,7 @@
     .btn-expense, .btn-daily { width: 100%; justify-content: center; }
     .header-actions { justify-content: stretch; }
     .header-actions > * { flex: 1; }
+    .stat-info h3 { font-size: 20px; }
 }
 </style>
 

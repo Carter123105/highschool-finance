@@ -91,6 +91,63 @@ $toCurrency = function ($amount) use ($currency, $rate) {
 
 /*
 |--------------------------------------------------------------------------
+| MOBILE MONEY REFERENCE NUMBER
+|--------------------------------------------------------------------------
+| Check common field names used by different providers:
+| - transaction_reference (generic)
+| - reference_no / reference_number
+| - momo_reference / mpesa_reference
+| - mpesa_receipt_number
+| - payment_reference
+| - gateway_reference
+| - operator_reference
+*/
+$mobileMoneyRef = null;
+
+// Check payment model for reference fields
+$refFields = [
+    'transaction_reference',
+    'reference_no',
+    'reference_number',
+    'momo_reference',
+    'mpesa_reference',
+    'mpesa_receipt_number',
+    'payment_reference',
+    'gateway_reference',
+    'operator_reference',
+    'external_id',
+    'checkout_request_id',
+];
+
+foreach ($refFields as $field) {
+    if (!empty($payment->{$field})) {
+        $mobileMoneyRef = $payment->{$field};
+        break;
+    }
+}
+
+// Also check metadata/json fields if stored that way
+if (!$mobileMoneyRef && !empty($payment->metadata)) {
+    $metadata = is_string($payment->metadata) 
+        ? json_decode($payment->metadata, true) 
+        : $payment->metadata;
+    
+    if (is_array($metadata)) {
+        foreach (['reference', 'transaction_reference', 'receipt_number', 'mpesa_receipt', 'momo_ref'] as $metaKey) {
+            if (!empty($metadata[$metaKey])) {
+                $mobileMoneyRef = $metadata[$metaKey];
+                break;
+            }
+        }
+    }
+}
+
+// Check payment method to label correctly
+$paymentMethod = strtolower($payment->payment_method ?? $payment->method ?? 'cash');
+$isMobileMoney = in_array($paymentMethod, ['mobile_money', 'momo', 'mpesa', 'mtn', 'orange_money', 'wave', 'airtel_money']);
+
+/*
+|--------------------------------------------------------------------------
 | ALL PAYMENTS FOR THIS INVOICE - FILTERED BY STUDENT
 |--------------------------------------------------------------------------
 */
@@ -490,83 +547,70 @@ $transactionDate =
 
                 </div>
 
+                {{-- MOBILE MONEY REFERENCE --}}
+                @if($mobileMoneyRef)
+
+                    <div class="detail-row momo-ref-row">
+
+                        <div>
+
+                            <strong>💳 Payment Method:</strong>
+                            <span class="text-uppercase">{{ str_replace('_', ' ', $paymentMethod) }}</span>
+
+                        </div>
+
+                        <div class="text-end">
+
+                            <strong>📱 Reference No:</strong>
+                            <span class="momo-ref-code">{{ $mobileMoneyRef }}</span>
+
+                        </div>
+
+                    </div>
+
+                @elseif($isMobileMoney)
+
+                    <div class="detail-row momo-ref-row">
+
+                        <div>
+
+                            <strong>💳 Payment Method:</strong>
+                            <span class="text-uppercase">{{ str_replace('_', ' ', $paymentMethod) }}</span>
+
+                        </div>
+
+                        <div class="text-end">
+
+                            <strong>📱 Reference No:</strong>
+                            <span class="text-muted">N/A</span>
+
+                        </div>
+
+                    </div>
+
+                @else
+
+                    <div class="detail-row">
+
+                        <div>
+
+                            <strong>💳 Payment Method:</strong>
+                            <span class="text-uppercase">{{ str_replace('_', ' ', $paymentMethod) }}</span>
+
+                        </div>
+
+                        <div class="text-end">
+
+                            <strong>Received By:</strong>
+                            {{ optional($payment->receiver)->name ?? optional($payment->recordedBy)->name ?? 'System' }}
+
+                        </div>
+
+                    </div>
+
+                @endif
+
             </div>
-
-            {{-- PAYMENT HISTORY --}}
-            <div class="mini-title">
-
-                PAYMENT HISTORY
-
-            </div>
-
-            <table class="table table-bordered payment-history-table mb-1">
-
-                <thead>
-
-                    <tr>
-
-                        <th>#</th>
-                        <th>Date</th>
-                        <th>Method</th>
-                        <th class="text-end">Amount</th>
-
-                    </tr>
-
-                </thead>
-
-                <tbody>
-
-                    @forelse($invoicePayments as $index => $pay)
-
-                        @php
-                            $payDate = $pay->payment_date ?? $pay->created_at ?? null;
-                        @endphp
-
-                        <tr>
-
-                            <td>
-                                {{ $index + 1 }}
-                            </td>
-
-                            <td>
-                                {{
-                                    $payDate
-                                        ? \Carbon\Carbon::parse($payDate)->format('d M Y h:i A')
-                                        : 'N/A'
-                                }}
-                            </td>
-
-                            <td>
-                                {{ $pay->payment_method }}
-                            </td>
-
-                            <td class="text-end text-success fw-bold">
-
-                                {{ $currency }}
-                                {{ number_format($toCurrency($pay->amount_paid), 2) }}
-
-                            </td>
-
-                        </tr>
-
-                    @empty
-
-                        <tr>
-
-                            <td colspan="4"
-                                class="text-center text-muted">
-
-                                No payments found.
-
-                            </td>
-
-                        </tr>
-
-                    @endforelse
-
-                </tbody>
-
-            </table>
 
             {{-- TABLE --}}
             <table class="table payment-table mt-1 mb-1">
@@ -780,12 +824,12 @@ body{
     display:flex;
     justify-content:center;
     align-items:center;
-    opacity:0.03;
+    opacity:0.04;
     pointer-events:none;
 }
 
 .watermark img{
-    width:150px;
+    width:300px;
     height:auto;
     object-fit:contain;
 }
@@ -895,6 +939,23 @@ body{
     line-height:1.1;
 }
 
+/* MOBILE MONEY REFERENCE ROW */
+.momo-ref-row{
+    background:#f0f9ff;
+    border:1px dashed #0ea5e9;
+    border-radius:3px;
+    padding:4px 6px;
+    margin-top:3px;
+}
+
+.momo-ref-code{
+    font-family:'Courier New', monospace;
+    font-weight:700;
+    color:#0ea5e9;
+    font-size:13px;
+    letter-spacing:0.5px;
+}
+
 /* TABLES */
 .payment-history-table,
 .payment-table{
@@ -978,6 +1039,11 @@ body{
         gap:1px;
     }
 
+    .momo-ref-row{
+        flex-direction:column;
+        gap:2px;
+    }
+
     .payment-history-table th,
     .payment-table th,
     .payment-history-table td,
@@ -1037,7 +1103,7 @@ body{
         max-width:100% !important;
         padding:6px 8px !important;
         box-shadow:none !important;
-        border:1.5px solid #b91c1c !important;
+        border:4px solid #b91c1c !important;
         overflow:hidden !important;
     }
 
@@ -1085,6 +1151,16 @@ body{
         color:#fff !important;
     }
 
+    /* MOBILE MONEY REFERENCE ROW PRINT */
+    .momo-ref-row{
+        background:#f0f9ff !important;
+        border:1px dashed #0ea5e9 !important;
+    }
+
+    .momo-ref-code{
+        color:#0ea5e9 !important;
+    }
+
     *{
         -webkit-print-color-adjust:exact !important;
         print-color-adjust:exact !important;
@@ -1094,5 +1170,3 @@ body{
 </style>
 
 @endsection
-
-    

@@ -62,7 +62,7 @@ class ExpenseController extends Controller
             'description' => $validated['description'] ?? null,
             'category' => $validated['category'] ?? null,
             'expense_date' => $validated['expense_date'] ?? now(),
-            'user_id' => auth()->id(),
+            'user_id' => auth()->user()->id(),
             'academic_year_id' => session('academic_year_id'),
         ]);
 
@@ -134,4 +134,4 @@ class ExpenseController extends Controller
             ->route('expenses.index')
             ->with('success', 'Expense deleted successfully.');
     }
-}
+}                

@@ -60,6 +60,11 @@ class AuthenticatedSessionController extends Controller
 
         if ($user->hasRole('Registrar') || $user->role === 'Registrar') {
             return redirect()->route('registrar.dashboard');
+        };
+
+        
+        if ($user->hasRole('Teacher') || $user->role === 'Teacher') {
+            return redirect()->route('teacher.dashboard');
         }
 
         /*

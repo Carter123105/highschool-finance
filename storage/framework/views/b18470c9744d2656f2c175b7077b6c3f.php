@@ -4,46 +4,86 @@
 
     
     <div class="d-flex justify-content-between align-items-center mb-3">
-        <h4 class="fw-bold">Students</h4>
 
-        <a href="<?php echo e(route('students.create')); ?>" class="btn btn-primary">
+        <h4 class="fw-bold mb-0">
+            Students
+        </h4>
+
+        <a href="<?php echo e(route('students.create')); ?>"
+           class="btn btn-primary">
             + Create Student
         </a>
+
     </div>
 
     
     <div class="card mb-3 shadow-sm border-0">
-        <div class="card-body d-flex flex-wrap gap-3 align-items-center">
 
-            
-            <div style="min-width: 250px;">
-                <label class="form-label fw-semibold">Filter by Class</label>
+        <div class="card-body">
 
-                <select id="classFilter" class="form-select">
-                    <option value="">All Classes</option>
+            <form method="GET" action="<?php echo e(route('students.index')); ?>">
 
-                    <?php $__currentLoopData = $classes; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $class): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
-                        <option value="<?php echo e($class->id); ?>">
-                            <?php echo e($class->name); ?>
+                <div class="row g-3 align-items-end">
 
-                        </option>
-                    <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
-                </select>
-            </div>
+                    
+                    <div class="col-md-4">
 
-            
-            <div style="min-width: 250px;">
-                <label class="form-label fw-semibold">Search Student</label>
-                <input type="text" id="searchInput" class="form-control" placeholder="Search name or ID...">
-            </div>
+                        <label class="form-label fw-semibold">
+                            Filter by Class
+                        </label>
 
-            <div class="mt-4">
-                <button class="btn btn-secondary" onclick="resetFilters()">
-                    Reset
-                </button>
-            </div>
+                        <select name="class_id" class="form-select">
+
+                            <option value="">All Classes</option>
+
+                            <?php $__currentLoopData = $classes; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $class): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+
+                                <option value="<?php echo e($class->id); ?>"
+                                    <?php echo e(request('class_id') == $class->id ? 'selected' : ''); ?>>
+                                    <?php echo e($class->name); ?>
+
+                                </option>
+
+                            <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+
+                        </select>
+
+                    </div>
+
+                    
+                    <div class="col-md-4">
+
+                        <label class="form-label fw-semibold">
+                            Search Student
+                        </label>
+
+                        <input type="text"
+                               name="search"
+                               class="form-control"
+                               placeholder="Search name or ID..."
+                               value="<?php echo e(request('search')); ?>">
+
+                    </div>
+
+                    
+                    <div class="col-md-4 d-flex gap-2">
+
+                        <button type="submit" class="btn btn-primary">
+                            Filter
+                        </button>
+
+                        <a href="<?php echo e(route('students.index')); ?>" class="btn btn-secondary">
+                            Reset
+                        </a>
+
+                    </div>
+
+                </div>
+
+            </form>
 
         </div>
+
     </div>
 
     
@@ -74,152 +114,227 @@
 
                 <tbody>
 
-                <?php $__empty_1 = true; $__currentLoopData = $students; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $student): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); $__empty_1 = false; ?>
+                    <?php $__empty_1 = true; $__currentLoopData = $students; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $student): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); $__empty_1 = false; ?>
 
-                    <tr class="student-row"
-                        data-class="<?php echo e($student->class_id); ?>">
+                        <tr>
 
-                        <td><?php echo e($loop->iteration); ?></td>
+                            <td><?php echo e($loop->iteration); ?></td>
 
-                        <td class="student-id">
-                            <?php echo e($student->student_id); ?>
+                            <td><?php echo e($student->student_id); ?></td>
 
-                        </td>
+                            <td class="fw-semibold">
+                                <?php echo e($student->first_name); ?> <?php echo e($student->last_name); ?>
 
-                        <td class="fw-semibold student-name">
-                            <?php echo e($student->first_name); ?> <?php echo e($student->last_name); ?>
+                            </td>
 
-                        </td>
+                            <td><?php echo e($student->schoolClass?->name ?? 'N/A'); ?></td>
 
-                        
-                        <td>
-                            <?php echo e($student->schoolClass?->name ?? 'N/A'); ?>
+                            <td><?php echo e($student->section?->name ?? 'N/A'); ?></td>
 
-                        </td>
+                            <td><?php echo e($student->academicYear?->name ?? 'N/A'); ?></td>
 
-                        <td>
-                            <?php echo e($student->section?->name ?? 'N/A'); ?>
+                            <td>
+                                <span class="badge bg-secondary">
+                                    <?php echo e($student->gender); ?>
 
-                        </td>
+                                </span>
+                            </td>
 
-                        <td>
-                            <?php echo e($student->academicYear?->name ?? 'N/A'); ?>
+                            <td>
+                                <?php if($student->student_type == 'New'): ?>
+                                    <span class="badge bg-success">New</span>
+                                <?php elseif($student->student_type == 'Old'): ?>
+                                    <span class="badge bg-warning text-dark">Old</span>
+                                <?php else: ?>
+                                    <span class="badge bg-light text-dark">N/A</span>
+                                <?php endif; ?>
+                            </td>
 
-                        </td>
+                            <td><?php echo e($student->phone ?? 'N/A'); ?></td>
 
-                        <td>
-                            <span class="badge bg-secondary">
-                                <?php echo e($student->gender); ?>
+                            <td>
+                                <div class="d-flex gap-1 flex-wrap">
 
-                            </span>
-                        </td>
+                                    <a href="<?php echo e(route('students.show', $student->id)); ?>"
+                                       class="btn btn-sm btn-info">
+                                        View
+                                    </a>
 
-                        
-                        <td>
-                            <?php if($student->student_type == 'New'): ?>
-                                <span class="badge bg-success">New</span>
-                            <?php elseif($student->student_type == 'Old'): ?>
-                                <span class="badge bg-warning text-dark">Old</span>
-                            <?php else: ?>
-                                <span class="badge bg-light text-dark">N/A</span>
-                            <?php endif; ?>
-                        </td>
+                                    <a href="<?php echo e(route('students.edit', $student->id)); ?>"
+                                       class="btn btn-sm btn-warning">
+                                        Edit
+                                    </a>
 
-                        <td>
-                            <?php echo e($student->phone ?? 'N/A'); ?>
+                                    <form action="<?php echo e(route('students.destroy', $student->id)); ?>"
+                                          method="POST"
+                                          onsubmit="return confirm('Delete this student?')">
 
-                        </td>
+                                        <?php echo csrf_field(); ?>
+                                        <?php echo method_field('DELETE'); ?>
 
-                        <td class="d-flex gap-1 flex-wrap">
+                                        <button type="submit"
+                                                class="btn btn-sm btn-danger">
+                                            Delete
+                                        </button>
 
-                            <a href="<?php echo e(route('students.show', $student->id)); ?>"
-                               class="btn btn-sm btn-info">
-                                View
-                            </a>
+                                    </form>
 
-                            <a href="<?php echo e(route('students.edit', $student->id)); ?>"
-                               class="btn btn-sm btn-warning">
-                                Edit
-                            </a>
+                                </div>
+                            </td>
 
-                            <form action="<?php echo e(route('students.destroy', $student->id)); ?>"
-                                  method="POST"
-                                  onsubmit="return confirm('Delete this student?')">
+                        </tr>
 
-                                <?php echo csrf_field(); ?>
-                                <?php echo method_field('DELETE'); ?>
+                    <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); if ($__empty_1): ?>
 
-                                <button class="btn btn-sm btn-danger">
-                                    Delete
-                                </button>
+                        <tr>
+                            <td colspan="10" class="text-center text-muted py-4">
+                                No students found
+                            </td>
+                        </tr>
 
-                            </form>
-
-                        </td>
-
-                    </tr>
-
-                <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); if ($__empty_1): ?>
-
-                    <tr>
-                        <td colspan="10" class="text-center text-muted py-4">
-                            No students found
-                        </td>
-                    </tr>
-
-                <?php endif; ?>
+                    <?php endif; ?>
 
                 </tbody>
 
             </table>
 
-            <div class="mt-3">
-                <?php echo e($students->links()); ?>
+            
+            <?php if($students->hasPages()): ?>
 
-            </div>
+                <div class="students-pagination-wrapper">
+
+                    <div class="pagination-info">
+                        Showing
+                        <strong><?php echo e($students->firstItem()); ?></strong>
+                        -
+                        <strong><?php echo e($students->lastItem()); ?></strong>
+                        of
+                        <strong><?php echo e($students->total()); ?></strong>
+                        students
+                    </div>
+
+                    <div class="pagination-links">
+
+                        
+                        <?php if($students->onFirstPage()): ?>
+                            <span class="pagination-btn disabled">Previous</span>
+                        <?php else: ?>
+                            <a href="<?php echo e($students->previousPageUrl()); ?>"
+                               class="pagination-btn">Previous</a>
+                        <?php endif; ?>
+
+                        
+                        <?php $__currentLoopData = $students->getUrlRange(1, $students->lastPage()); $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $page => $url): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+
+                            <?php if($page == $students->currentPage()): ?>
+                                <span class="pagination-number active"><?php echo e($page); ?></span>
+                            <?php else: ?>
+                                <a href="<?php echo e($url); ?>" class="pagination-number"><?php echo e($page); ?></a>
+                            <?php endif; ?>
+
+                        <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+
+                        
+                        <?php if($students->hasMorePages()): ?>
+                            <a href="<?php echo e($students->nextPageUrl()); ?>"
+                               class="pagination-btn">Next</a>
+                        <?php else: ?>
+                            <span class="pagination-btn disabled">Next</span>
+                        <?php endif; ?>
+
+                    </div>
+
+                </div>
+
+            <?php endif; ?>
 
         </div>
+
     </div>
 
 </div>
 
-
-<script>
-document.addEventListener("DOMContentLoaded", function () {
-
-    const classFilter = document.getElementById("classFilter");
-    const searchInput = document.getElementById("searchInput");
-    const rows = document.querySelectorAll(".student-row");
-
-    function filterTable() {
-
-        const classValue = classFilter.value;
-        const searchValue = searchInput.value.toLowerCase();
-
-        rows.forEach(row => {
-
-            const studentClass = row.dataset.class;
-            const studentName = row.querySelector(".student-name").textContent.toLowerCase();
-            const studentId = row.querySelector(".student-id").textContent.toLowerCase();
-
-            const matchClass = classValue === "" || studentClass === classValue;
-            const matchSearch = studentName.includes(searchValue) || studentId.includes(searchValue);
-
-            row.style.display = (matchClass && matchSearch) ? "" : "none";
-        });
-    }
-
-    classFilter.addEventListener("change", filterTable);
-    searchInput.addEventListener("keyup", filterTable);
-
-    window.resetFilters = function () {
-        classFilter.value = "";
-        searchInput.value = "";
-        filterTable();
-    }
-
-});
-</script>
-
 <?php $__env->stopSection(); ?>
+
+
+<style>
+
+.students-pagination-wrapper{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    flex-wrap:wrap;
+    gap:20px;
+    margin-top:25px;
+    padding:18px 22px;
+    background:#fff;
+    border-radius:16px;
+    box-shadow:0 4px 18px rgba(0,0,0,0.05);
+    border:1px solid #eef2f7;
+}
+
+.pagination-info{
+    color:#64748b;
+    font-size:14px;
+}
+
+.pagination-links{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    flex-wrap:wrap;
+}
+
+.pagination-btn,
+.pagination-number{
+    text-decoration:none;
+    min-width:42px;
+    height:42px;
+    padding:0 16px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    border-radius:12px;
+    font-weight:600;
+    font-size:14px;
+    transition:all .2s ease;
+    border:1px solid #e2e8f0;
+    background:#fff;
+    color:#334155;
+}
+
+.pagination-number:hover,
+.pagination-btn:hover{
+    background:#2563eb;
+    color:#fff;
+    border-color:#2563eb;
+    transform:translateY(-2px);
+    box-shadow:0 6px 14px rgba(37,99,235,.18);
+}
+
+.pagination-number.active{
+    background:#2563eb;
+    color:#fff;
+    border-color:#2563eb;
+    box-shadow:0 6px 14px rgba(37,99,235,.20);
+}
+
+.pagination-btn.disabled{
+    opacity:.5;
+    pointer-events:none;
+    background:#f8fafc;
+}
+
+@media(max-width:768px){
+    .students-pagination-wrapper{
+        flex-direction:column;
+        align-items:flex-start;
+    }
+
+    .pagination-links{
+        width:100%;
+    }
+}
+
+</style>
 <?php echo $__env->make('layouts.app', array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?><?php /**PATH C:\xampp\htdocs\highschool-finance\resources\views/students/index.blade.php ENDPATH**/ ?>

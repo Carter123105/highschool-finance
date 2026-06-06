@@ -17,16 +17,11 @@ class AdminSeeder extends Seeder
             [
                 'name' => 'System Admin',
                 'password' => Hash::make('password'),
-                'role' => 'Admin',
                 'is_blocked' => false,
             ]
         );
 
-        /*
-        |--------------------------------------------------------------------------
-        | ASSIGN SPATIE ROLE
-        |--------------------------------------------------------------------------
-        */
+        // Assign Spatie role
         if (!$admin->hasRole('Admin')) {
             $admin->assignRole('Admin');
         }

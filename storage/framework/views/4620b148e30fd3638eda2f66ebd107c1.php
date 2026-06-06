@@ -81,14 +81,12 @@
 
                         <div class="d-flex gap-2">
 
-                            
                             <?php if($student->student_type == 'New'): ?>
                                 <span class="badge bg-success px-3 py-2">New</span>
                             <?php elseif($student->student_type == 'Old'): ?>
                                 <span class="badge bg-warning text-dark px-3 py-2">Old</span>
                             <?php endif; ?>
 
-                            
                             <span class="badge bg-primary px-3 py-2">
                                 <?php echo e($student->status); ?>
 
@@ -117,15 +115,7 @@
                         <div class="col-md-6">
                             <div class="info-box">
                                 <small>Student Type</small>
-                                <h6>
-                                    <?php if($student->student_type == 'New'): ?>
-                                        <span class="text-success">● New Student</span>
-                                    <?php elseif($student->student_type == 'Old'): ?>
-                                        <span class="text-warning">● Returning Student</span>
-                                    <?php else: ?>
-                                        <span class="text-muted">N/A</span>
-                                    <?php endif; ?>
-                                </h6>
+                                <h6><?php echo e($student->student_type); ?></h6>
                             </div>
                         </div>
 
@@ -190,6 +180,7 @@
 
                         </a>
 
+                        
                         <a href="<?php echo e(route('students.payments', $student->id)); ?>"
                            class="btn btn-success btn-sm">
 
@@ -217,12 +208,10 @@
     background:#f4f7fb;
 }
 
-/* CARD */
 .profile-card{
     border-radius:18px;
 }
 
-/* PHOTO */
 .profile-photo{
     display:flex;
     justify-content:center;
@@ -245,7 +234,6 @@
     font-size:32px;
 }
 
-/* INFO BOX */
 .info-box{
     background:#f8fafc;
     padding:12px 14px;
@@ -264,7 +252,6 @@
     color:#0f172a;
 }
 
-/* RESPONSIVE */
 @media(max-width:768px){
     .no-photo{
         width:120px;
