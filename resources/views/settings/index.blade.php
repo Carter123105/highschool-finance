@@ -119,7 +119,7 @@
             <div class="col-lg-4">
 
                 <!-- LOGO CARD -->
-                <div class="card border-0 shadow-sm">
+                <div class="card border-0 shadow-sm mb-4">
 
                     <div class="card-header bg-white border-0">
                         <h5 class="fw-bold mb-0">School Logo</h5>
@@ -128,27 +128,12 @@
                     <div class="card-body text-center">
 
                         @php
-                            /*
-                            |--------------------------------------------------------------------------
-                            | SAFE LOGO FIX
-                            |--------------------------------------------------------------------------
-                            */
-
                             $logoPath = $setting->logo ?? null;
-
-                            // remove broken prefixes
-                            $logoPath = $logoPath ? str_replace([
-                                'storage/',
-                                'public/'
-                            ], '', $logoPath) : null;
-
-                            $logoUrl = $logoPath
-                                ? asset('storage/' . $logoPath)
-                                : null;
+                            $logoPath = $logoPath ? str_replace(['storage/', 'public/'], '', $logoPath) : null;
+                            $logoUrl = $logoPath ? asset('storage/' . $logoPath) : null;
                         @endphp
 
                         @if($logoUrl)
-
                             <img
                                 src="{{ $logoUrl }}"
                                 class="img-fluid rounded mb-3 shadow-sm"
@@ -156,34 +141,105 @@
                                 alt="School Logo"
                                 onerror="this.style.display='none'; document.getElementById('logo-error').style.display='block';"
                             >
-
                             <div id="logo-error" class="alert alert-warning" style="display:none;">
-                                <small>
-                                    Logo not found at:<br>
-                                    <code>{{ $logoUrl }}</code>
-                                </small>
+                                <small>Logo not found at:<br><code>{{ $logoUrl }}</code></small>
                             </div>
-
                         @else
-
-                            <div class="text-muted mb-3">
-                                No logo uploaded
-                            </div>
-
+                            <div class="text-muted mb-3">No logo uploaded</div>
                         @endif
 
                         <input type="file" name="logo" class="form-control" accept="image/*">
 
-                        <small class="text-muted d-block mt-2">
-                            Recommended: PNG or JPG (200x200px)
-                        </small>
+                        <small class="text-muted d-block mt-2">Recommended: PNG or JPG (200x200px)</small>
+
+                    </div>
+
+                </div>
+
+                <!-- AUTHORIZED SIGNATURE CARD -->
+                <div class="card border-0 shadow-sm mb-4">
+
+                    <div class="card-header bg-white border-0">
+                        <h5 class="fw-bold mb-0">Authorized Signature</h5>
+                    </div>
+
+                    <div class="card-body text-center">
+
+                        @php
+                            $authSigPath = $setting->authorized_signature ?? null;
+                            $authSigPath = $authSigPath ? str_replace(['storage/', 'public/'], '', $authSigPath) : null;
+                            $authSigUrl = $authSigPath ? asset('storage/' . $authSigPath) : null;
+                        @endphp
+
+                        @if($authSigUrl)
+                            <img
+                                src="{{ $authSigUrl }}"
+                                class="img-fluid rounded mb-3 shadow-sm bg-white border"
+                                style="max-height:100px; object-fit:contain;"
+                                alt="Authorized Signature"
+                                onerror="this.style.display='none'; document.getElementById('auth-sig-error').style.display='block';"
+                            >
+                            <div id="auth-sig-error" class="alert alert-warning" style="display:none;">
+                                <small>Signature not found at:<br><code>{{ $authSigUrl }}</code></small>
+                            </div>
+                        @else
+                            <div class="text-muted mb-3">
+                                <i class="bi bi-pen fs-1 d-block mb-2"></i>
+                                No signature uploaded
+                            </div>
+                        @endif
+
+                        <input type="file" name="authorized_signature" class="form-control" accept="image/*">
+
+                        <small class="text-muted d-block mt-2">Upload scanned signature (PNG with transparent background preferred)</small>
+
+                    </div>
+
+                </div>
+
+                <!-- REGISTRAR SIGNATURE CARD -->
+                <div class="card border-0 shadow-sm mb-4">
+
+                    <div class="card-header bg-white border-0">
+                        <h5 class="fw-bold mb-0">Registrar Signature</h5>
+                    </div>
+
+                    <div class="card-body text-center">
+
+                        @php
+                            $regSigPath = $setting->registrar_signature ?? null;
+                            $regSigPath = $regSigPath ? str_replace(['storage/', 'public/'], '', $regSigPath) : null;
+                            $regSigUrl = $regSigPath ? asset('storage/' . $regSigPath) : null;
+                        @endphp
+
+                        @if($regSigUrl)
+                            <img
+                                src="{{ $regSigUrl }}"
+                                class="img-fluid rounded mb-3 shadow-sm bg-white border"
+                                style="max-height:100px; object-fit:contain;"
+                                alt="Registrar Signature"
+                                onerror="this.style.display='none'; document.getElementById('reg-sig-error').style.display='block';"
+                            >
+                            <div id="reg-sig-error" class="alert alert-warning" style="display:none;">
+                                <small>Signature not found at:<br><code>{{ $regSigUrl }}</code></small>
+                            </div>
+                        @else
+                            <div class="text-muted mb-3">
+                                <i class="bi bi-pen fs-1 d-block mb-2"></i>
+                                No signature uploaded
+                            </div>
+                        @endif
+
+                        <input type="file" name="registrar_signature" class="form-control" accept="image/*">
+
+                        <small class="text-muted d-block mt-2">Upload scanned signature (PNG with transparent background preferred)</small>
 
                     </div>
 
                 </div>
 
                 <!-- SAVE BUTTON -->
-                <div class="card border-0 shadow-sm mt-4">
+                <div class="card border-0 shadow-sm">
                     <div class="card-body">
                         <button type="submit" class="btn btn-primary w-100 btn-lg fw-bold">
                             Save Settings

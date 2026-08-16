@@ -24,12 +24,11 @@ class BalanceReportController extends Controller
         $classId = $request->input('class_id');
         $search = $request->input('search');
         $statusFilter = $request->input('status');
-        $studentType = $request->input('student_type'); // 'Old' or 'New'
+        $studentType = $request->input('student_type');
 
-        // Get all classes for filter dropdown
         $classes = SchoolClass::orderBy('name')->get();
 
-        // Build student query with filters (this controls the TABLE display)
+        // Build student query with filters
         $studentsQuery = Student::with(['schoolClass', 'section'])
             ->when($classId, fn ($q) => $q->where('class_id', $classId))
             ->when($studentType, fn ($q) => $q->where('student_type', $studentType))
@@ -41,10 +40,9 @@ class BalanceReportController extends Controller
                 });
             });
 
-        // Paginate for table display
         $students = $studentsQuery->paginate(50)->withQueryString();
 
-        // Fetch ALL students in the selected class for summary cards (ignore student_type filter)
+        // Fetch ALL students in selected class for summary cards
         $allClassStudentsQuery = Student::with(['schoolClass', 'section'])
             ->when($classId, fn ($q) => $q->where('class_id', $classId))
             ->when($search, function ($q) use ($search) {
@@ -57,70 +55,54 @@ class BalanceReportController extends Controller
 
         $allClassStudents = $allClassStudentsQuery->get();
 
-        // Fetch invoices for ALL students in the class (both Old and New)
-        $allStudentData = $allClassStudents->mapWithKeys(function ($student) {
-            return [$student->id => [
-                'class_id' => $student->class_id,
-                'section_id' => $student->section_id,
-                'student_type' => $student->student_type,
-            ]];
-        });
+        // ============================================================
+        // FETCH INVOICES (class-level, keyed for lookup)
+        // ============================================================
+        $allStudentIds = $allClassStudents->pluck('id');
 
-        // Get unique class+section+type combinations for invoice fetching
-        $invoiceConditions = [];
-        $seenCombinations = [];
-        foreach ($allStudentData as $data) {
-            $key = $data['class_id'] . '-' . $data['section_id'] . '-' . $data['student_type'];
-            if (!isset($seenCombinations[$key])) {
-                $seenCombinations[$key] = true;
-                $invoiceConditions[] = [
-                    'class_id' => $data['class_id'],
-                    'section_id' => $data['section_id'],
-                    'student_type' => $data['student_type'],
-                ];
+        $invoices = Invoice::query()
+            ->when($yearId, fn ($q) => $q->where('academic_year_id', $yearId))
+            ->when($classId, fn ($q) => $q->where('class_id', $classId))
+            ->when($studentType, fn ($q) => $q->where('student_type', $studentType))
+            ->get();
+
+        // Key invoices: exact match AND class-wide fallback (null section)
+        $invoiceLookup = [];
+        foreach ($invoices as $invoice) {
+            $exactKey = $invoice->class_id . '-' . ($invoice->section_id ?? 'null') . '-' . $invoice->student_type;
+            $invoiceLookup[$exactKey] = $invoice;
+
+            $classWideKey = $invoice->class_id . '-null-' . $invoice->student_type;
+            if (!isset($invoiceLookup[$classWideKey])) {
+                $invoiceLookup[$classWideKey] = $invoice;
             }
         }
 
-        $invoices = collect();
-        if (!empty($invoiceConditions)) {
-            $invoiceQuery = Invoice::query();
-            $invoiceQuery->where(function ($q) use ($invoiceConditions) {
-                foreach ($invoiceConditions as $index => $condition) {
-                    $method = $index === 0 ? 'where' : 'orWhere';
-                    $q->{$method}(function ($subQ) use ($condition) {
-                        $subQ->where('class_id', $condition['class_id'])
-                             ->where('section_id', $condition['section_id'])
-                             ->where('student_type', $condition['student_type']);
-                    });
-                }
-            });
-
-            $invoices = $invoiceQuery
-                ->when($yearId, fn ($q) => $q->where('academic_year_id', $yearId))
-                ->get()
-                ->keyBy(function ($invoice) {
-                    return $invoice->class_id . '-' . $invoice->section_id . '-' . $invoice->student_type;
-                });
-        }
-
-        // Fetch payments for ALL students in the class
-        $allStudentIds = $allClassStudents->pluck('id');
+        // ============================================================
+        // FIX: FETCH PAYMENTS PER STUDENT (not from invoice paid_amount)
+        // ============================================================
         $payments = Payment::whereIn('student_id', $allStudentIds)
-            ->select('student_id', 'invoice_id', DB::raw('SUM(amount_paid) as total_paid'))
-            ->groupBy('student_id', 'invoice_id')
-            ->get();
+            ->select('student_id', DB::raw('SUM(amount_paid) as total_paid'))
+            ->groupBy('student_id')
+            ->get()
+            ->keyBy('student_id');
 
-        $paymentLookup = [];
-        foreach ($payments as $payment) {
-            $paymentLookup[$payment->student_id][$payment->invoice_id] = (float) $payment->total_paid;
-        }
+        $resolveInvoice = function ($student) use ($invoiceLookup) {
+            $exactKey = $student->class_id . '-' . ($student->section_id ?? 'null') . '-' . $student->student_type;
+            if (isset($invoiceLookup[$exactKey])) {
+                return $invoiceLookup[$exactKey];
+            }
+            $fallbackKey = $student->class_id . '-null-' . $student->student_type;
+            return $invoiceLookup[$fallbackKey] ?? null;
+        };
 
-        // Helper function to build reports
-        $buildReport = function ($studentList) use ($invoices, $paymentLookup, $statusFilter, $yearId) {
+        // ============================================================
+        // BUILD REPORTS: Per-student expected (from invoice) vs paid (individual)
+        // ============================================================
+        $buildReport = function ($studentList) use ($resolveInvoice, $payments, $statusFilter) {
             $reports = [];
             foreach ($studentList as $student) {
-                $invoiceKey = $student->class_id . '-' . $student->section_id . '-' . $student->student_type;
-                $invoice = $invoices->get($invoiceKey);
+                $invoice = $resolveInvoice($student);
 
                 if (!$invoice) {
                     if ($statusFilter && $statusFilter !== 'No Invoice') {
@@ -137,13 +119,16 @@ class BalanceReportController extends Controller
                     continue;
                 }
 
+                // Expected = class invoice total (same for all students in class/type)
                 $expected = (float) $invoice->total_amount;
-                $paidFromPayments = (float) ($paymentLookup[$student->id][$invoice->id] ?? 0);
-                $paid = max((float) $invoice->paid_amount, $paidFromPayments);
+
+                // PAID = ONLY this student's individual payments
+                $paid = (float) ($payments->get($student->id)?->total_paid ?? 0);
+
                 $balance = max(0, $expected - $paid);
 
                 $status = match (true) {
-                    $paid == 0 => 'Not Paid',
+                    $paid <= 0 => 'Not Paid',
                     $paid >= $expected => 'Fully Paid',
                     default => 'Partially Paid',
                 };
@@ -164,13 +149,13 @@ class BalanceReportController extends Controller
             return $reports;
         };
 
-        // Build reports for TABLE (filtered by student_type)
+        // Build reports for TABLE (paginated)
         $reports = $buildReport($students);
 
-        // Build reports for ALL students in class (for summary cards)
+        // Build reports for ALL class students (summary cards)
         $allReports = $buildReport($allClassStudents);
 
-        // Calculate grand totals from TABLE data
+        // Grand totals from TABLE
         $grandExpected = 0;
         $grandPaid = 0;
         $grandBalance = 0;
@@ -180,15 +165,9 @@ class BalanceReportController extends Controller
             $grandBalance += $report['balance'];
         }
 
-        // Calculate per-type totals from ALL class students (for summary cards)
-        $oldExpected = 0;
-        $oldPaid = 0;
-        $oldBalance = 0;
-        $oldCount = 0;
-        $newExpected = 0;
-        $newPaid = 0;
-        $newBalance = 0;
-        $newCount = 0;
+        // Per-type totals from ALL students
+        $oldExpected = 0; $oldPaid = 0; $oldBalance = 0; $oldCount = 0;
+        $newExpected = 0; $newPaid = 0; $newBalance = 0; $newCount = 0;
 
         foreach ($allReports as $report) {
             $student = $report['student'];
@@ -235,13 +214,11 @@ class BalanceReportController extends Controller
     public function export(Request $request): StreamedResponse
     {
         $yearId = session('academic_year_id');
-
         $classId = $request->input('class_id');
         $search = $request->input('search');
         $statusFilter = $request->input('status');
         $studentType = $request->input('student_type');
 
-        // Build student query with all filters
         $studentsQuery = Student::with(['schoolClass', 'section'])
             ->when($classId, fn ($q) => $q->where('class_id', $classId))
             ->when($studentType, fn ($q) => $q->where('student_type', $studentType))
@@ -256,83 +233,52 @@ class BalanceReportController extends Controller
         $students = $studentsQuery->get();
 
         // Fetch invoices
-        $studentData = $students->mapWithKeys(function ($student) {
-            return [$student->id => [
-                'class_id' => $student->class_id,
-                'section_id' => $student->section_id,
-                'student_type' => $student->student_type,
-            ]];
-        });
+        $invoices = Invoice::query()
+            ->when($yearId, fn ($q) => $q->where('academic_year_id', $yearId))
+            ->when($classId, fn ($q) => $q->where('class_id', $classId))
+            ->when($studentType, fn ($q) => $q->where('student_type', $studentType))
+            ->get();
 
-        $invoiceConditions = [];
-        $seenCombinations = [];
-        foreach ($studentData as $data) {
-            $key = $data['class_id'] . '-' . $data['section_id'] . '-' . $data['student_type'];
-            if (!isset($seenCombinations[$key])) {
-                $seenCombinations[$key] = true;
-                $invoiceConditions[] = [
-                    'class_id' => $data['class_id'],
-                    'section_id' => $data['section_id'],
-                    'student_type' => $data['student_type'],
-                ];
+        $invoiceLookup = [];
+        foreach ($invoices as $invoice) {
+            $exactKey = $invoice->class_id . '-' . ($invoice->section_id ?? 'null') . '-' . $invoice->student_type;
+            $invoiceLookup[$exactKey] = $invoice;
+
+            $classWideKey = $invoice->class_id . '-null-' . $invoice->student_type;
+            if (!isset($invoiceLookup[$classWideKey])) {
+                $invoiceLookup[$classWideKey] = $invoice;
             }
         }
 
-        $invoices = collect();
-        if (!empty($invoiceConditions)) {
-            $invoiceQuery = Invoice::query();
-            $invoiceQuery->where(function ($q) use ($invoiceConditions) {
-                foreach ($invoiceConditions as $index => $condition) {
-                    $method = $index === 0 ? 'where' : 'orWhere';
-                    $q->{$method}(function ($subQ) use ($condition) {
-                        $subQ->where('class_id', $condition['class_id'])
-                             ->where('section_id', $condition['section_id'])
-                             ->where('student_type', $condition['student_type']);
-                    });
-                }
-            });
-
-            $invoices = $invoiceQuery
-                ->when($yearId, fn ($q) => $q->where('academic_year_id', $yearId))
-                ->get()
-                ->keyBy(function ($invoice) {
-                    return $invoice->class_id . '-' . $invoice->section_id . '-' . $invoice->student_type;
-                });
-        }
-
-        // Payment lookup
+        // FIX: Payments per student (not grouped by invoice_id)
         $studentIds = $students->pluck('id');
         $payments = Payment::whereIn('student_id', $studentIds)
-            ->select('student_id', 'invoice_id', DB::raw('SUM(amount_paid) as total_paid'))
-            ->groupBy('student_id', 'invoice_id')
-            ->get();
+            ->select('student_id', DB::raw('SUM(amount_paid) as total_paid'))
+            ->groupBy('student_id')
+            ->get()
+            ->keyBy('student_id');
 
-        $paymentLookup = [];
-        foreach ($payments as $payment) {
-            $paymentLookup[$payment->student_id][$payment->invoice_id] = (float) $payment->total_paid;
-        }
+        $resolveInvoice = function ($student) use ($invoiceLookup) {
+            $exactKey = $student->class_id . '-' . ($student->section_id ?? 'null') . '-' . $student->student_type;
+            if (isset($invoiceLookup[$exactKey])) {
+                return $invoiceLookup[$exactKey];
+            }
+            $fallbackKey = $student->class_id . '-null-' . $student->student_type;
+            return $invoiceLookup[$fallbackKey] ?? null;
+        };
 
         $headers = [
-            'Student ID',
-            'Name',
-            'Type',
-            'Class',
-            'Section',
-            'Invoice No',
-            'Expected',
-            'Paid',
-            'Balance',
-            'Status'
+            'Student ID', 'Name', 'Type', 'Class', 'Section',
+            'Invoice No', 'Expected', 'Paid', 'Balance', 'Status'
         ];
 
-        $callback = function () use ($students, $invoices, $paymentLookup, $statusFilter) {
+        $callback = function () use ($students, $resolveInvoice, $payments, $statusFilter) {
             $file = fopen('php://output', 'w');
             fprintf($file, chr(0xEF).chr(0xBB).chr(0xBF));
             fputcsv($file, $headers);
 
             foreach ($students as $student) {
-                $invoiceKey = $student->class_id . '-' . $student->section_id . '-' . $student->student_type;
-                $invoice = $invoices->get($invoiceKey);
+                $invoice = $resolveInvoice($student);
 
                 if (!$invoice) {
                     if ($statusFilter && $statusFilter !== 'No Invoice') continue;
@@ -343,22 +289,17 @@ class BalanceReportController extends Controller
                         $student->student_type,
                         $student->schoolClass?->name ?? 'N/A',
                         $student->section?->name ?? 'N/A',
-                        'N/A',
-                        '0.00',
-                        '0.00',
-                        '0.00',
-                        'No Invoice'
+                        'N/A', '0.00', '0.00', '0.00', 'No Invoice'
                     ]);
                     continue;
                 }
 
                 $expected = (float) $invoice->total_amount;
-                $paidFromPayments = (float) ($paymentLookup[$student->id][$invoice->id] ?? 0);
-                $paid = max((float) $invoice->paid_amount, $paidFromPayments);
+                $paid = (float) ($payments->get($student->id)?->total_paid ?? 0);
                 $balance = max(0, $expected - $paid);
 
                 $status = match (true) {
-                    $paid == 0 => 'Not Paid',
+                    $paid <= 0 => 'Not Paid',
                     $paid >= $expected => 'Fully Paid',
                     default => 'Partially Paid',
                 };

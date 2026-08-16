@@ -32,6 +32,10 @@
                 </div>
             @endif
 
+            @if(session('error'))
+                <div class="alert alert-danger">{{ session('error') }}</div>
+            @endif
+
             {{-- Form --}}
             <form action="{{ route('invoices.update', $invoice) }}" method="POST" id="invoiceForm">
                 @csrf
@@ -42,6 +46,9 @@
                 <input type="hidden" name="student_type" value="{{ $invoice->student_type }}">
                 <input type="hidden" name="academic_year_id" value="{{ $invoice->academic_year_id }}">
                 <input type="hidden" name="section_id" value="{{ $invoice->section_id }}">
+
+                {{-- TRACK DELETED ITEMS --}}
+                <input type="hidden" name="deleted_items" id="deletedItems" value="">
 
                 <div class="card">
                     <div class="card-body">
@@ -100,9 +107,7 @@
 
                         <hr>
 
-                        {{-- ============================================ --}}
-                        {{-- FEE STRUCTURE TABLE WITH ACTUAL INPUTS       --}}
-                        {{-- ============================================ --}}
+                        {{-- FEE STRUCTURE TABLE --}}
                         <h5 class="mb-3">Fee Structure <span class="badge bg-secondary" id="itemCount">{{ $invoice->invoiceItems->count() }} items</span></h5>
 
                         <div class="table-responsive">
@@ -122,39 +127,41 @@
                                         $items = [];
 
                                         if ($oldItems !== null) {
-                                            // Form was submitted with errors - use old input
                                             foreach ($oldItems as $i => $catId) {
                                                 $items[] = [
+                                                    'invoice_item_id' => old('invoice_item_id.'.$i),
                                                     'fee_category_id' => $catId,
                                                     'amount' => old('amount.'.$i, 0),
                                                     'discount' => old('discount.'.$i, 0),
                                                 ];
                                             }
                                         } else {
-                                            // First load - use existing invoice items
                                             foreach ($invoice->invoiceItems as $item) {
                                                 $items[] = [
+                                                    'invoice_item_id' => $item->id,
                                                     'fee_category_id' => $item->fee_category_id,
                                                     'amount' => $item->amount,
-                                                    'discount' => $item->discount,
+                                                    'discount' => $item->discount ?? 0,
                                                 ];
                                             }
                                         }
 
                                         if (empty($items)) {
-                                            $items = [['fee_category_id' => '', 'amount' => 0, 'discount' => 0]];
+                                            $items = [['invoice_item_id' => null, 'fee_category_id' => '', 'amount' => 0, 'discount' => 0]];
                                         }
                                     @endphp
 
                                     @foreach($items as $index => $item)
                                         @php
+                                            $invoiceItemId = $item['invoice_item_id'] ?? null;
                                             $feeCategoryId = $item['fee_category_id'] ?? '';
                                             $amount = $item['amount'] ?? 0;
                                             $discount = $item['discount'] ?? 0;
                                             $subtotal = max(0, (float)$amount - (float)$discount);
                                         @endphp
 
-                                        <tr class="fee-item-row" data-index="{{ $index }}">
+                                        <tr class="fee-item-row" data-index="{{ $index }}" data-item-id="{{ $invoiceItemId ?? '' }}">
+                                            <input type="hidden" name="invoice_item_id[{{ $index }}]" value="{{ $invoiceItemId }}">
                                             <td>
                                                 <select name="fee_category_id[{{ $index }}]" 
                                                         class="form-select form-select-sm fee-category-select @error('fee_category_id.'.$index) is-invalid @enderror" 
@@ -239,29 +246,40 @@
         </div>
     </div>
 </div>
-@endsection
 
-@push('scripts')
 <script>
+(function() {
+    'use strict';
+
     let rowIndex = {{ count($items) }};
+    let deletedItems = [];
+
+    // Pre-build category options for new rows
+    const categoryOptions = [
+        @foreach($feeCategories as $category)
+            { id: {{ $category->id }}, name: "{{ addslashes($category->name) }}" },
+        @endforeach
+    ];
+
+    function buildCategorySelect(name) {
+        let html = `<select name="${name}" class="form-select form-select-sm fee-category-select" required><option value="">-- Select Category --</option>`;
+        categoryOptions.forEach(cat => {
+            html += `<option value="${cat.id}">${cat.name}</option>`;
+        });
+        html += `</select>`;
+        return html;
+    }
 
     document.getElementById('addRowBtn').addEventListener('click', function() {
         const tbody = document.getElementById('feeItemsBody');
         const newRow = document.createElement('tr');
         newRow.className = 'fee-item-row';
         newRow.setAttribute('data-index', rowIndex);
-
-        const feeCategoriesOptions = `@foreach($feeCategories as $category)
-            <option value="{{ $category->id }}">{{ $category->name }}</option>
-        @endforeach`;
+        newRow.setAttribute('data-item-id', '');
 
         newRow.innerHTML = `
-            <td>
-                <select name="fee_category_id[${rowIndex}]" class="form-select form-select-sm fee-category-select" required>
-                    <option value="">-- Select Category --</option>
-                    ${feeCategoriesOptions}
-                </select>
-            </td>
+            <input type="hidden" name="invoice_item_id[${rowIndex}]" value="">
+            <td>${buildCategorySelect('fee_category_id[' + rowIndex + ']')}</td>
             <td>
                 <input type="number" name="amount[${rowIndex}]" class="form-control form-control-sm amount-input" value="0.00" step="0.01" min="0" required>
             </td>
@@ -283,13 +301,19 @@
         rowIndex++;
         updateItemCount();
         attachCalculations(newRow);
-
         document.querySelectorAll('.remove-row').forEach(btn => btn.disabled = false);
     });
 
-    function removeRow(button) {
+    window.removeRow = function(button) {
         const row = button.closest('tr');
         const tbody = document.getElementById('feeItemsBody');
+        const itemId = row.getAttribute('data-item-id');
+
+        // Track deleted existing items
+        if (itemId && itemId !== '') {
+            deletedItems.push(itemId);
+            document.getElementById('deletedItems').value = deletedItems.join(',');
+        }
 
         if (tbody.children.length > 1) {
             row.remove();
@@ -303,12 +327,14 @@
         } else {
             alert('At least one fee item is required.');
         }
-    }
+    };
 
     function reindexRows() {
         const rows = document.querySelectorAll('.fee-item-row');
         rows.forEach((row, index) => {
             row.setAttribute('data-index', index);
+            const itemIdInput = row.querySelector('input[name^="invoice_item_id"]');
+            if (itemIdInput) itemIdInput.name = `invoice_item_id[${index}]`;
             row.querySelector('.fee-category-select').name = `fee_category_id[${index}]`;
             row.querySelector('.amount-input').name = `amount[${index}]`;
             row.querySelector('.discount-input').name = `discount[${index}]`;
@@ -353,10 +379,11 @@
         });
     }
 
+    // Initialize
     document.querySelectorAll('.fee-item-row').forEach(row => {
         attachCalculations(row);
     });
-
     calculateTotal();
+})();
 </script>
-@endpush
+@endsection

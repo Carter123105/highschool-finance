@@ -2,9 +2,9 @@
 
 namespace App\Http\Controllers;
 
-use App\Http\Controllers\Controller;
 use App\Models\Setting;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 
 class SettingController extends Controller
 {
@@ -17,9 +17,9 @@ class SettingController extends Controller
 
         if (!$setting) {
             $setting = Setting::create([
-                'school_name' => 'LIGHT ACADEMY MODEL SCHOOL',
-                'currency' => 'LRD',
-                'exchange_rate' => 190, // default rate
+                'school_name'   => 'LIGHT ACADEMY MODEL SCHOOL',
+                'currency'      => 'LRD',
+                'exchange_rate' => 190,
             ]);
         }
 
@@ -32,33 +32,37 @@ class SettingController extends Controller
     public function update(Request $request)
     {
         $request->validate([
-            'school_name'     => 'required|string|max:255',
-            'school_email'    => 'nullable|email|max:255',
-            'school_phone'    => 'nullable|string|max:255',
-            'school_address'  => 'nullable|string',
-
-            'currency'        => 'required|in:LRD,USD',
-
-            // ✅ FIX: exchange rate validation added
-            'exchange_rate'   => 'nullable|numeric|min:0',
-
-            'receipt_prefix'  => 'nullable|string|max:50',
-            'system_name'     => 'nullable|string|max:255',
-            'logo'            => 'nullable|image|mimes:jpg,jpeg,png|max:2048',
+            'school_name'            => 'required|string|max:255',
+            'school_email'           => 'nullable|email|max:255',
+            'school_phone'           => 'nullable|string|max:255',
+            'school_address'         => 'nullable|string',
+            'currency'               => 'required|in:LRD,USD',
+            'exchange_rate'          => 'nullable|numeric|min:0',
+            'receipt_prefix'         => 'nullable|string|max:50',
+            'system_name'            => 'nullable|string|max:255',
+            'logo'                   => 'nullable|image|mimes:jpg,jpeg,png|max:2048',
+            'authorized_signature'   => 'nullable|image|mimes:jpg,jpeg,png|max:2048',
+            'registrar_signature'    => 'nullable|image|mimes:jpg,jpeg,png|max:2048',
         ]);
 
-        $setting = Setting::first();
-
-        if (!$setting) {
-            $setting = new Setting();
-        }
+        $setting = Setting::firstOrNew();
 
         /**
-         * LOGO UPLOAD
+         * FILE UPLOADS
          */
         if ($request->hasFile('logo')) {
-            $logo = $request->file('logo')->store('settings', 'public');
-            $setting->logo = $logo;
+            $this->deleteIfExists($setting->logo);
+            $setting->logo = $request->file('logo')->store('settings/logos', 'public');
+        }
+
+        if ($request->hasFile('authorized_signature')) {
+            $this->deleteIfExists($setting->authorized_signature);
+            $setting->authorized_signature = $request->file('authorized_signature')->store('settings/signatures', 'public');
+        }
+
+        if ($request->hasFile('registrar_signature')) {
+            $this->deleteIfExists($setting->registrar_signature);
+            $setting->registrar_signature = $request->file('registrar_signature')->store('settings/signatures', 'public');
         }
 
         /**
@@ -69,11 +73,11 @@ class SettingController extends Controller
         $setting->school_phone   = $request->school_phone;
         $setting->school_address = $request->school_address;
         $setting->currency       = $request->currency;
+        $setting->receipt_prefix = $request->receipt_prefix;
+        $setting->system_name    = $request->system_name;
 
         /**
-         * ✅ FIX: SAVE EXCHANGE RATE PROPERLY
-         * - If USD selected → use input value
-         * - If LRD selected → keep existing or reset default
+         * EXCHANGE RATE LOGIC
          */
         if ($request->currency === 'USD') {
             $setting->exchange_rate = $request->exchange_rate ?? $setting->exchange_rate ?? 190;
@@ -81,11 +85,18 @@ class SettingController extends Controller
             $setting->exchange_rate = $setting->exchange_rate ?? 190;
         }
 
-        $setting->receipt_prefix = $request->receipt_prefix;
-        $setting->system_name    = $request->system_name;
-
         $setting->save();
 
         return back()->with('success', 'Settings updated successfully');
+    }
+
+    /**
+     * Helper: Delete a file from public storage if it exists
+     */
+    private function deleteIfExists(?string $path): void
+    {
+        if ($path && Storage::disk('public')->exists($path)) {
+            Storage::disk('public')->delete($path);
+        }
     }
 }

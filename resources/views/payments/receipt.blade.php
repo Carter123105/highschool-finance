@@ -24,21 +24,37 @@ $logoUrl = null;
 $logoPath = $setting->logo ?? null;
 
 if ($logoPath) {
-    // Handle different storage path formats
-    // Remove 'storage/' prefix if it exists since we'll use Storage::url()
     $cleanPath = ltrim(str_replace('storage/', '', $logoPath), '/');
     
-    // Check if file exists in public storage
     if (Storage::disk('public')->exists($cleanPath)) {
         $logoUrl = Storage::disk('public')->url($cleanPath);
     } else {
-        // Fallback: try direct asset path
         $logoUrl = asset('storage/' . $cleanPath);
     }
 }
 
-// Fallback logo (default school icon)
 $defaultLogo = asset('images/default-school-logo.png');
+
+/*
+|--------------------------------------------------------------------------
+| SIGNATURE HANDLING
+|--------------------------------------------------------------------------
+*/
+function getSignatureUrl(?string $path): ?string
+{
+    if (!$path) return null;
+    
+    $cleanPath = ltrim(str_replace(['storage/', 'public/'], '', $path), '/');
+    
+    if (Storage::disk('public')->exists($cleanPath)) {
+        return Storage::disk('public')->url($cleanPath);
+    }
+    
+    return asset('storage/' . $cleanPath);
+}
+
+$authorizedSigUrl = getSignatureUrl($setting->authorized_signature ?? null);
+$registrarSigUrl  = getSignatureUrl($setting->registrar_signature ?? null);
 
 /*
 |--------------------------------------------------------------------------
@@ -93,18 +109,9 @@ $toCurrency = function ($amount) use ($currency, $rate) {
 |--------------------------------------------------------------------------
 | MOBILE MONEY REFERENCE NUMBER
 |--------------------------------------------------------------------------
-| Check common field names used by different providers:
-| - transaction_reference (generic)
-| - reference_no / reference_number
-| - momo_reference / mpesa_reference
-| - mpesa_receipt_number
-| - payment_reference
-| - gateway_reference
-| - operator_reference
 */
 $mobileMoneyRef = null;
 
-// Check payment model for reference fields
 $refFields = [
     'transaction_reference',
     'reference_no',
@@ -126,7 +133,6 @@ foreach ($refFields as $field) {
     }
 }
 
-// Also check metadata/json fields if stored that way
 if (!$mobileMoneyRef && !empty($payment->metadata)) {
     $metadata = is_string($payment->metadata) 
         ? json_decode($payment->metadata, true) 
@@ -142,7 +148,6 @@ if (!$mobileMoneyRef && !empty($payment->metadata)) {
     }
 }
 
-// Check payment method to label correctly
 $paymentMethod = strtolower($payment->payment_method ?? $payment->method ?? 'cash');
 $isMobileMoney = in_array($paymentMethod, ['mobile_money', 'momo', 'mpesa', 'mtn', 'orange_money', 'wave', 'airtel_money']);
 
@@ -187,38 +192,85 @@ $allAllocations = PaymentAllocation::with([
 
 /*
 |--------------------------------------------------------------------------
-| SORT FEES
+| FEE BREAKDOWN
 |--------------------------------------------------------------------------
 */
-$sortedAllocations = $allAllocations->sortBy(function ($alloc) {
+$invoiceItems = collect();
 
-    $name = strtolower(
-        optional(
-            optional($alloc->invoiceItem)->feeCategory
-        )->name
-    );
+if ($invoice) {
 
-    if (str_contains($name, 'registration')) return 1;
-    if (str_contains($name, '1st')) return 2;
-    if (str_contains($name, '2nd')) return 3;
-    if (str_contains($name, '3rd')) return 4;
-    if (str_contains($name, '4th')) return 5;
+    try {
 
-    return 99;
-});
+        $invoiceItems = $invoice->items()
+            ->with('feeCategory')
+            ->get();
 
-/*
-|--------------------------------------------------------------------------
-| GROUP FEES
-|--------------------------------------------------------------------------
-*/
-$feeBreakdown = $sortedAllocations->groupBy(function ($alloc) {
+    } catch (\Throwable $e) {
 
-    return optional(
-        optional($alloc->invoiceItem)->feeCategory
-    )->name ?? 'Fee';
+        try {
 
-});
+            $invoiceItems = $invoice->invoiceItems()
+                ->with('feeCategory')
+                ->get();
+
+        } catch (\Throwable $e2) {
+
+            $invoiceItems = $allAllocations
+                ->pluck('invoiceItem')
+                ->filter()
+                ->unique('id')
+                ->values();
+
+        }
+
+    }
+
+}
+
+$paidPerItem = $allAllocations
+    ->groupBy(function ($alloc) {
+        return optional($alloc->invoiceItem)->id;
+    })
+    ->map(function ($allocs) {
+        return floatval($allocs->sum('amount'));
+    });
+
+$feeRows = $invoiceItems
+    ->groupBy(function ($item) {
+        return optional($item->feeCategory)->name ?? 'Fee';
+    })
+    ->map(function ($items, $feeName) use ($paidPerItem) {
+
+        $expectedRaw = floatval($items->sum('subtotal'));
+
+        $paidRaw = floatval(
+            $items->sum(function ($item) use ($paidPerItem) {
+                return $paidPerItem->get($item->id, 0);
+            })
+        );
+
+        return [
+            'name'     => $feeName,
+            'expected' => $expectedRaw,
+            'paid'     => $paidRaw,
+            'balance'  => max(0, $expectedRaw - $paidRaw),
+        ];
+
+    })
+    ->sortBy(function ($row) {
+
+        $name = strtolower($row['name']);
+
+        if (str_contains($name, 'registration')) return 1;
+        if (str_contains($name, '1st')) return 2;
+        if (str_contains($name, '2nd')) return 3;
+        if (str_contains($name, '3rd')) return 4;
+        if (str_contains($name, '4th')) return 5;
+
+        return 99;
+
+    })
+    ->values();
 
 /*
 |--------------------------------------------------------------------------
@@ -259,60 +311,36 @@ $status =
 | STUDENT INFO - CLASS FETCHING
 |--------------------------------------------------------------------------
 */
-
-// Try multiple possible relation names for class
 $className = 'N/A';
 
 if ($student) {
 
-    // Check various possible relation names
     if ($student->schoolClass) {
-
         $className = $student->schoolClass->name;
-
     } elseif ($student->school_class) {
-
         $className = $student->school_class->name;
-
     } elseif ($student->classRoom) {
-
         $className = $student->classRoom->name;
-
     } elseif ($student->classroom) {
-
         $className = $student->classroom->name;
-
     } elseif ($student->class) {
-
         $className = $student->class->name;
-
     } elseif ($student->class_name) {
-
         $className = $student->class_name;
-
     } elseif ($student->grade) {
-
         $className = $student->grade;
-
     }
 
 }
 
-// Fallback to invoice class if student has none
 if ($className === 'N/A' && $invoice) {
 
     if ($invoice->class_name) {
-
         $className = $invoice->class_name;
-
     } elseif ($invoice->schoolClass) {
-
         $className = $invoice->schoolClass->name;
-
     } elseif ($invoice->class) {
-
         $className = $invoice->class->name;
-
     }
 
 }
@@ -334,7 +362,7 @@ $studentType =
 
 /*
 |--------------------------------------------------------------------------
-| TRANSACTION DATE - SAFELY PARSED WITH CARBON
+| TRANSACTION DATE
 |--------------------------------------------------------------------------
 */
 $transactionDate =
@@ -348,13 +376,9 @@ $transactionDate =
 @if($noData)
 
 <div class="container py-4 text-center">
-
     <div class="alert alert-danger">
-
         ❌ No invoice or student data found.
-
     </div>
-
 </div>
 
 @else
@@ -363,14 +387,9 @@ $transactionDate =
 
     {{-- PRINT BUTTON --}}
     <div class="text-center mb-2 no-print">
-
-        <button onclick="window.print()"
-                class="btn btn-danger btn-sm px-3 py-1">
-
+        <button onclick="window.print()" class="btn btn-danger btn-sm px-3 py-1">
             🖨 Print Receipt
-
         </button>
-
     </div>
 
     <div class="receipt-wrapper">
@@ -379,138 +398,78 @@ $transactionDate =
 
             {{-- WATERMARK --}}
             @if($logoUrl)
-
                 <div class="watermark">
-
                     <img src="{{ $logoUrl }}" alt="School Logo" onerror="this.style.display='none'">
-
                 </div>
-
             @endif
 
             {{-- HEADER --}}
             <div class="receipt-header">
 
                 <div class="logo-box">
-
                     @if($logoUrl)
-
                         <img src="{{ $logoUrl }}"
                              alt="{{ $setting->school_name ?? 'School Logo' }}"
                              class="school-logo"
                              onerror="this.src='{{ $defaultLogo }}'; this.onerror=null;">
-
                     @else
-
                         <div class="logo-placeholder">
-
                             <span>🏫</span>
-
                         </div>
-
                     @endif
-
                 </div>
 
                 <div class="school-info">
-
                     <h2 class="school-name">
-
                         {{ $setting->school_name ?? 'SCHOOL NAME' }}
-
                     </h2>
-
                     <p class="system-name">
-
                         {{ $setting->system_name ?? 'Finance System' }}
-
                     </p>
-
-                    <p>
-
-                        {{ $setting->school_address ?? 'Address' }}
-
-                    </p>
-
-                    <p>
-
-                        Tel: {{ $setting->school_phone ?? 'N/A' }}
-
-                    </p>
-
+                    <p>{{ $setting->school_address ?? 'Address' }}</p>
+                    <p>Tel: {{ $setting->school_phone ?? 'N/A' }}</p>
                 </div>
 
                 <div class="header-right">
-
                     <div>
-
                         <strong>Date</strong><br>
-
                         <span>
-
                             {{
                                 $transactionDate
                                     ? \Carbon\Carbon::parse($transactionDate)->format('d M Y h:i A')
                                     : 'N/A'
                             }}
-
                         </span>
-
                     </div>
-
                     <div class="mt-1">
-
                         <strong>Class</strong><br>
-
-                        <span>
-
-                            {{ $className }}
-
-                        </span>
-
+                        <span>{{ $className }}</span>
                     </div>
-
                 </div>
 
             </div>
 
             {{-- TITLE --}}
             <div class="receipt-title">
-
                 OFFICIAL PAYMENT RECEIPT
-
             </div>
 
             {{-- DETAILS --}}
             <div class="details">
 
                 <div class="detail-row">
-
                     <div>
-
-                        <strong>Receipt:</strong>
-                        {{ $receiptNo }}
-
+                        <strong>Receipt:</strong> {{ $receiptNo }}
                     </div>
-
                     <div class="text-end">
-
-                        <strong>Invoice:</strong>
-                        {{ $invoice->invoice_no ?? 'N/A' }}
-
+                        <strong>Invoice:</strong> {{ $invoice->invoice_no ?? 'N/A' }}
                     </div>
-
                 </div>
 
                 <div class="detail-row">
-
                     <div>
-
-                        <strong>Student:</strong>
-                        {{ $studentName }}
-
+                        <strong>Student:</strong> {{ $studentName }}
                         <br>
-
                         <small class="
                             @if(strtolower($studentType) == 'new')
                                 text-primary
@@ -520,17 +479,11 @@ $transactionDate =
                                 text-muted
                             @endif
                         ">
-
                             ({{ ucfirst($studentType) }} Student)
-
                         </small>
-
                     </div>
-
                     <div class="text-end">
-
                         <strong>Status:</strong>
-
                         <span class="
                             @if($status == 'Fully Paid')
                                 text-success
@@ -542,72 +495,43 @@ $transactionDate =
                         ">
                             {{ $status }}
                         </span>
-
                     </div>
-
                 </div>
 
                 {{-- MOBILE MONEY REFERENCE --}}
                 @if($mobileMoneyRef)
-
                     <div class="detail-row momo-ref-row">
-
                         <div>
-
                             <strong>💳 Payment Method:</strong>
                             <span class="text-uppercase">{{ str_replace('_', ' ', $paymentMethod) }}</span>
-
                         </div>
-
                         <div class="text-end">
-
                             <strong>📱 Reference No:</strong>
                             <span class="momo-ref-code">{{ $mobileMoneyRef }}</span>
-
                         </div>
-
                     </div>
-
                 @elseif($isMobileMoney)
-
                     <div class="detail-row momo-ref-row">
-
                         <div>
-
                             <strong>💳 Payment Method:</strong>
                             <span class="text-uppercase">{{ str_replace('_', ' ', $paymentMethod) }}</span>
-
                         </div>
-
                         <div class="text-end">
-
                             <strong>📱 Reference No:</strong>
                             <span class="text-muted">N/A</span>
-
                         </div>
-
                     </div>
-
                 @else
-
                     <div class="detail-row">
-
                         <div>
-
                             <strong>💳 Payment Method:</strong>
                             <span class="text-uppercase">{{ str_replace('_', ' ', $paymentMethod) }}</span>
-
                         </div>
-
                         <div class="text-end">
-
                             <strong>Received By:</strong>
                             {{ optional($payment->receiver)->name ?? optional($payment->recordedBy)->name ?? 'System' }}
-
                         </div>
-
                     </div>
-
                 @endif
 
             </div>
@@ -616,160 +540,96 @@ $transactionDate =
             <table class="table payment-table mt-1 mb-1">
 
                 <thead>
-
                     <tr>
-
                         <th>Fee Type</th>
-
-                        <th class="text-end">
-                            Paid
-                        </th>
-
-                        <th class="text-end">
-                            Balance
-                        </th>
-
+                        <th class="text-end">Fee Total</th>
+                        <th class="text-end">Paid</th>
+                        <th class="text-end">Balance</th>
                     </tr>
-
                 </thead>
 
                 <tbody>
 
-                @forelse($feeBreakdown as $feeName => $items)
-
-                    @php
-
-                        $expectedRaw = floatval(
-                            optional(
-                                $items->first()->invoiceItem
-                            )->subtotal ?? 0
-                        );
-
-                        $paidRaw = floatval(
-                            $items->sum('amount')
-                        );
-
-                        $feeBalanceRaw = max(
-                            0,
-                            $expectedRaw - $paidRaw
-                        );
-
-                    @endphp
-
+                @forelse($feeRows as $row)
                     <tr>
-
-                        <td>
-
-                            {{ $feeName }}
-
+                        <td>{{ $row['name'] }}</td>
+                        <td class="text-end">
+                            {{ $currency }} {{ number_format($toCurrency($row['expected']), 2) }}
                         </td>
-
                         <td class="text-end text-success">
-
-                            {{ $currency }}
-                            {{ number_format($toCurrency($paidRaw), 2) }}
-
+                            {{ $currency }} {{ number_format($toCurrency($row['paid']), 2) }}
                         </td>
-
-                        <td class="text-end text-danger">
-
-                            {{ $currency }}
-                            {{ number_format($toCurrency($feeBalanceRaw), 2) }}
-
+                        <td class="text-end {{ $row['balance'] > 0 ? 'text-danger' : 'text-muted' }}">
+                            {{ $currency }} {{ number_format($toCurrency($row['balance']), 2) }}
                         </td>
-
                     </tr>
-
                 @empty
-
                     <tr>
-
-                        <td colspan="3"
-                            class="text-center text-muted">
-
+                        <td colspan="4" class="text-center text-muted">
                             No Fee Breakdown Found
-
                         </td>
-
                     </tr>
-
                 @endforelse
 
-                    {{-- TOTAL PAID --}}
-                    <tr>
-
-                        <td>
-
-                            <strong>Total Paid</strong>
-
+                    {{-- TOTALS ROW --}}
+                    <tr class="totals-row">
+                        <td><strong>Total</strong></td>
+                        <td class="text-end">
+                            <strong>{{ $currency }} {{ number_format($totalInvoice, 2) }}</strong>
                         </td>
-
-                        <td class="text-end"
-                            colspan="2">
-
-                            <strong class="text-success">
-
-                                {{ $currency }}
-                                {{ number_format($totalPaid, 2) }}
-
-                            </strong>
-
+                        <td class="text-end">
+                            <strong class="text-success">{{ $currency }} {{ number_format($totalPaid, 2) }}</strong>
                         </td>
-
-                    </tr>
-
-                    {{-- REAL BALANCE --}}
-                    <tr>
-
-                        <td>
-
-                            <strong>Total Balance</strong>
-
+                        <td class="text-end">
+                            <strong class="text-danger">{{ $currency }} {{ number_format($balance, 2) }}</strong>
                         </td>
-
-                        <td class="text-end text-danger"
-                            colspan="2">
-
-                            <strong>
-
-                                {{ $currency }}
-                                {{ number_format($balance, 2) }}
-
-                            </strong>
-
-                        </td>
-
                     </tr>
 
                 </tbody>
 
             </table>
 
-            {{-- SIGNATURE --}}
+            {{-- SIGNATURES --}}
             <div class="signature-area">
 
+                {{-- AUTHORIZED SIGNATURE --}}
                 <div class="signature-box">
-
-                    <div class="line"></div>
-
-                    <small class="sig-text">
-
-                        AUTHORIZED SIGNATURE
-
-                    </small>
-
+                    <div class="signature-image-wrapper">
+                        @if($authorizedSigUrl)
+                            <img src="{{ $authorizedSigUrl }}"
+                                 alt="Authorized Signature"
+                                 class="signature-img"
+                                 onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                            <div class="signature-placeholder" style="display:none;">
+                                <span class="sig-placeholder-line"></span>
+                            </div>
+                        @else
+                            <div class="signature-placeholder">
+                                <span class="sig-placeholder-line"></span>
+                            </div>
+                        @endif
+                    </div>
+                    <small class="sig-text">AUTHORIZED SIGNATURE</small>
                 </div>
 
+                {{-- REGISTRAR SIGNATURE --}}
                 <div class="signature-box">
-
-                    <div class="line"></div>
-
-                    <small class="sig-text">
-
-                        REGISTRAR SIGNATURE
-
-                    </small>
-
+                    <div class="signature-image-wrapper">
+                        @if($registrarSigUrl)
+                            <img src="{{ $registrarSigUrl }}"
+                                 alt="Registrar Signature"
+                                 class="signature-img"
+                                 onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                            <div class="signature-placeholder" style="display:none;">
+                                <span class="sig-placeholder-line"></span>
+                            </div>
+                        @else
+                            <div class="signature-placeholder">
+                                <span class="sig-placeholder-line"></span>
+                            </div>
+                        @endif
+                    </div>
+                    <small class="sig-text">REGISTRAR SIGNATURE</small>
                 </div>
 
             </div>
@@ -989,27 +849,72 @@ body{
     background:#f9fafb;
 }
 
-/* SIGNATURE */
+/* TOTALS ROW */
+.payment-table .totals-row td{
+    background:#f3f4f6 !important;
+    border-top:2px solid #1e3a8a !important;
+}
+
+/* SIGNATURE AREA */
 .signature-area{
     display:flex;
     justify-content:space-between;
-    gap:12px;
-    margin-top:10px;
+    gap:24px;
+    margin-top:16px;
+    padding:0 20px;
 }
 
 .signature-box{
-    width:45%;
+    width:42%;
     text-align:center;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
 }
 
-.line{
-    border-top:1px solid #000;
+/* SIGNATURE IMAGE WRAPPER */
+.signature-image-wrapper{
+    width:100%;
+    height:50px;
+    display:flex;
+    align-items:flex-end;
+    justify-content:center;
+    margin-bottom:4px;
+    position:relative;
+}
+
+/* ACTUAL SIGNATURE IMAGE */
+.signature-img{
+    max-width:100%;
+    max-height:48px;
+    object-fit:contain;
+    object-position:center bottom;
+}
+
+/* SIGNATURE PLACEHOLDER (when no image) */
+.signature-placeholder{
+    width:100%;
+    height:100%;
+    display:flex;
+    align-items:flex-end;
+    justify-content:center;
+}
+
+.sig-placeholder-line{
+    display:block;
+    width:100%;
+    height:1px;
+    background:#000;
     margin-bottom:2px;
 }
 
+/* SIGNATURE LABEL */
 .sig-text{
-    font-size:12px;
+    font-size:11px;
     font-weight:700;
+    color:#374151;
+    text-transform:uppercase;
+    letter-spacing:0.3px;
 }
 
 /* PRINT BUTTON */
@@ -1049,6 +954,15 @@ body{
     .payment-history-table td,
     .payment-table td{
         font-size:16px;
+    }
+
+    .signature-area{
+        gap:16px;
+        padding:0 10px;
+    }
+
+    .signature-box{
+        width:48%;
     }
 }
 
@@ -1151,6 +1065,10 @@ body{
         color:#fff !important;
     }
 
+    .payment-table .totals-row td{
+        background:#f3f4f6 !important;
+    }
+
     /* MOBILE MONEY REFERENCE ROW PRINT */
     .momo-ref-row{
         background:#f0f9ff !important;
@@ -1159,6 +1077,34 @@ body{
 
     .momo-ref-code{
         color:#0ea5e9 !important;
+    }
+
+    /* SIGNATURES PRINT */
+    .signature-area{
+        margin-top:16px !important;
+        gap:24px !important;
+        padding:0 20px !important;
+    }
+
+    .signature-box{
+        width:42% !important;
+    }
+
+    .signature-image-wrapper{
+        height:50px !important;
+    }
+
+    .signature-img{
+        max-height:48px !important;
+    }
+
+    .sig-placeholder-line{
+        background:#000 !important;
+    }
+
+    .sig-text{
+        color:#374151 !important;
+        font-size:11px !important;
     }
 
     *{

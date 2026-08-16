@@ -18,7 +18,7 @@
     <div>
         <h3 class="fw-bold mb-1">Student Balance Report</h3>
         <p class="text-muted mb-0">
-            Track balances by Old and New students
+            Per-student balances based on class invoice & payments
         </p>
     </div>
 
@@ -90,27 +90,28 @@
 
                 {{-- STATUS --}}
                 <div class="col-md-3">
-                    <label class="form-label">Status</label>
+                    <label class="form-label">Payment Status</label>
                     <select name="status" class="form-select">
-                        <option value="">All</option>
+                        <option value="">All Statuses</option>
                         <option value="Fully Paid" {{ $statusFilter == 'Fully Paid' ? 'selected' : '' }}>Fully Paid</option>
                         <option value="Partially Paid" {{ $statusFilter == 'Partially Paid' ? 'selected' : '' }}>Partially Paid</option>
                         <option value="Not Paid" {{ $statusFilter == 'Not Paid' ? 'selected' : '' }}>Not Paid</option>
+                        <option value="No Invoice" {{ $statusFilter == 'No Invoice' ? 'selected' : '' }}>No Invoice</option>
                     </select>
                 </div>
 
                 {{-- SEARCH --}}
                 <div class="col-md-3">
-                    <label class="form-label">Search</label>
+                    <label class="form-label">Search Student</label>
                     <input type="text"
                            name="search"
                            class="form-control"
                            value="{{ $search }}"
-                           placeholder="Student name...">
+                           placeholder="Name or ID...">
                 </div>
 
                 <div class="col-12 d-flex gap-2">
-                    <button class="btn btn-primary">Filter</button>
+                    <button class="btn btn-primary"><i class="bi bi-funnel"></i> Filter</button>
                     <a href="{{ route('finance.balance') }}" class="btn btn-secondary">Reset</a>
                 </div>
 
@@ -127,39 +128,39 @@
 
     {{-- OLD STUDENTS --}}
     <div class="col-md-3">
-        <div class="card p-3 shadow-sm border-warning">
+        <div class="card p-3 shadow-sm border-warning h-100">
             <h6 class="text-warning"><i class="bi bi-person-check"></i> Old Students</h6>
-            <small>Count: {{ $oldCount ?? 0 }}</small><br>
-            <small>Expected: {{ number_format($oldExpected ?? 0, 2) }}</small><br>
-            <small>Paid: {{ number_format($oldPaid ?? 0, 2) }}</small><br>
-            <h5 class="text-danger fw-bold">Balance: {{ number_format($oldBalance ?? 0, 2) }}</h5>
+            <small>Count: <strong>{{ $oldCount ?? 0 }}</strong></small><br>
+            <small>Expected: <strong>{{ number_format($oldExpected ?? 0, 2) }}</strong></small><br>
+            <small>Paid: <strong class="text-success">{{ number_format($oldPaid ?? 0, 2) }}</strong></small><br>
+            <h5 class="text-danger fw-bold mt-2 mb-0">Balance: {{ number_format($oldBalance ?? 0, 2) }}</h5>
         </div>
     </div>
 
     {{-- NEW STUDENTS --}}
     <div class="col-md-3">
-        <div class="card p-3 shadow-sm border-success">
+        <div class="card p-3 shadow-sm border-success h-100">
             <h6 class="text-success"><i class="bi bi-person-plus"></i> New Students</h6>
-            <small>Count: {{ $newCount ?? 0 }}</small><br>
-            <small>Expected: {{ number_format($newExpected ?? 0, 2) }}</small><br>
-            <small>Paid: {{ number_format($newPaid ?? 0, 2) }}</small><br>
-            <h5 class="text-danger fw-bold">Balance: {{ number_format($newBalance ?? 0, 2) }}</h5>
+            <small>Count: <strong>{{ $newCount ?? 0 }}</strong></small><br>
+            <small>Expected: <strong>{{ number_format($newExpected ?? 0, 2) }}</strong></small><br>
+            <small>Paid: <strong class="text-success">{{ number_format($newPaid ?? 0, 2) }}</strong></small><br>
+            <h5 class="text-danger fw-bold mt-2 mb-0">Balance: {{ number_format($newBalance ?? 0, 2) }}</h5>
         </div>
     </div>
 
     {{-- TOTAL PAID --}}
     <div class="col-md-3">
-        <div class="card p-3 shadow-sm">
-            <h6 class="text-success">Total Paid</h6>
-            <h3 class="text-success">{{ number_format($grandPaid ?? 0, 2) }}</h3>
+        <div class="card p-3 shadow-sm h-100 text-center">
+            <h6 class="text-muted">Total Paid</h6>
+            <h3 class="text-success fw-bold">{{ number_format($grandPaid ?? 0, 2) }}</h3>
         </div>
     </div>
 
     {{-- TOTAL BALANCE --}}
     <div class="col-md-3">
-        <div class="card p-3 shadow-sm">
-            <h6 class="text-danger">Total Balance</h6>
-            <h3 class="text-danger">{{ number_format($grandBalance ?? 0, 2) }}</h3>
+        <div class="card p-3 shadow-sm h-100 text-center">
+            <h6 class="text-muted">Total Balance</h6>
+            <h3 class="text-danger fw-bold">{{ number_format($grandBalance ?? 0, 2) }}</h3>
         </div>
     </div>
 
@@ -168,22 +169,22 @@
 {{-- TABLE --}}
 <div class="card shadow-sm">
 
-    <div class="card-body table-responsive">
+    <div class="card-body table-responsive p-0">
 
-        <table class="table table-bordered align-middle">
+        <table class="table table-bordered table-hover align-middle mb-0">
 
             <thead class="table-dark">
                 <tr>
-                    <th>#</th>
+                    <th class="text-center" style="width:40px;">#</th>
                     <th>Student</th>
                     <th>Type</th>
                     <th>Class</th>
                     <th>Section</th>
                     <th>Invoice No</th>
-                    <th>Expected</th>
-                    <th>Paid</th>
-                    <th>Balance</th>
-                    <th>Status</th>
+                    <th class="text-end">Expected</th>
+                    <th class="text-end">Paid</th>
+                    <th class="text-end">Balance</th>
+                    <th class="text-center">Status</th>
                 </tr>
             </thead>
 
@@ -197,10 +198,11 @@
                 @endphp
 
                 <tr>
-                    <td>{{ $loop->iteration }}</td>
+                    <td class="text-center">{{ $loop->iteration }}</td>
 
-                    <td class="fw-bold">
-                        {{ $student->first_name }} {{ $student->last_name }}
+                    <td>
+                        <div class="fw-bold">{{ $student->first_name }} {{ $student->last_name }}</div>
+                        <small class="text-muted">ID: {{ $student->student_id ?? 'N/A' }}</small>
                     </td>
 
                     {{-- STUDENT TYPE BADGE --}}
@@ -214,38 +216,53 @@
                         @endif
                     </td>
 
+                    <td>{{ $student->schoolClass->name ?? 'N/A' }}</td>
+
+                    <td>{{ $student->section->name ?? 'N/A' }}</td>
+
+                    {{-- INVOICE NO FROM INVOICE TABLE --}}
                     <td>
-                        {{ $student->schoolClass->name ?? 'N/A' }}
+                        @if($invoice)
+                            <span class="badge bg-info text-dark">{{ $invoice->invoice_no }}</span>
+                        @else
+                            <span class="text-muted">—</span>
+                        @endif
                     </td>
 
-                    <td>
-                        {{ $student->section->name ?? 'N/A' }}
-                    </td>
-
-                    <td>
-                        {{ $invoice?->invoice_no ?? 'N/A' }}
-                    </td>
-
-                    <td class="text-primary fw-bold">
+                    {{-- EXPECTED FROM INVOICE TABLE --}}
+                    <td class="text-end fw-bold text-primary">
                         {{ number_format($report['expected'] ?? 0, 2) }}
                     </td>
 
-                    <td class="text-success fw-bold">
+                    {{-- PAID FROM PAYMENTS TABLE (linked to invoice) --}}
+                    <td class="text-end fw-bold text-success">
                         {{ number_format($report['paid'] ?? 0, 2) }}
                     </td>
 
-                    <td class="fw-bold {{ ($report['balance'] ?? 0) > 0 ? 'text-danger' : 'text-success' }}">
+                    {{-- BALANCE = EXPECTED - PAID --}}
+                    <td class="text-end fw-bold {{ ($report['balance'] ?? 0) > 0 ? 'text-danger' : 'text-success' }}">
                         {{ number_format($report['balance'] ?? 0, 2) }}
                     </td>
 
-                    <td>
-                        <span class="badge
-                            @if($report['status'] == 'Fully Paid') bg-success
-                            @elseif($report['status'] == 'Partially Paid') bg-warning text-dark
-                            @else bg-danger @endif">
-
-                            {{ $report['status'] }}
-                        </span>
+                    {{-- STATUS BASED ON INVOICE EXPECTED VS PAID --}}
+                    <td class="text-center">
+                        @if($report['status'] == 'Fully Paid')
+                            <span class="badge bg-success">
+                                <i class="bi bi-check-circle"></i> Fully Paid
+                            </span>
+                        @elseif($report['status'] == 'Partially Paid')
+                            <span class="badge bg-warning text-dark">
+                                <i class="bi bi-circle-half"></i> Partially Paid
+                            </span>
+                        @elseif($report['status'] == 'Not Paid')
+                            <span class="badge bg-danger">
+                                <i class="bi bi-x-circle"></i> Not Paid
+                            </span>
+                        @else
+                            <span class="badge bg-secondary">
+                                <i class="bi bi-dash-circle"></i> No Invoice
+                            </span>
+                        @endif
                     </td>
 
                 </tr>
@@ -253,8 +270,9 @@
             @empty
 
                 <tr>
-                    <td colspan="10" class="text-center text-muted py-4">
-                        No records found
+                    <td colspan="10" class="text-center text-muted py-5">
+                        <i class="bi bi-inbox fs-1 d-block mb-2"></i>
+                        No records found matching your filters
                     </td>
                 </tr>
 
@@ -262,13 +280,13 @@
 
             </tbody>
 
-            <tfoot class="table-light">
+            <tfoot class="table-light fw-bold">
                 <tr>
-                    <th colspan="6" class="text-end">GRAND TOTAL</th>
-                    <th class="text-primary">{{ number_format($grandExpected ?? 0, 2) }}</th>
-                    <th class="text-success">{{ number_format($grandPaid ?? 0, 2) }}</th>
-                    <th class="text-danger">{{ number_format($grandBalance ?? 0, 2) }}</th>
-                    <th></th>
+                    <td colspan="6" class="text-end">GRAND TOTAL</td>
+                    <td class="text-end text-primary">{{ number_format($grandExpected ?? 0, 2) }}</td>
+                    <td class="text-end text-success">{{ number_format($grandPaid ?? 0, 2) }}</td>
+                    <td class="text-end text-danger">{{ number_format($grandBalance ?? 0, 2) }}</td>
+                    <td></td>
                 </tr>
             </tfoot>
 

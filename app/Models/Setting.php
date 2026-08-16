@@ -11,12 +11,15 @@ class Setting extends Model
 
     protected $fillable = [
         'school_name',
+        'system_name',
         'school_email',
         'school_phone',
         'school_address',
         'currency',
-        'logo',
+        'exchange_rate',
         'receipt_prefix',
-        'system_name',
+        'logo',
+        'authorized_signature',
+        'registrar_signature',
     ];
 }
